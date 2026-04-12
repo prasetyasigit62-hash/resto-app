@@ -1,0 +1,21 @@
+# Node.js
+node_modules/
+npm-debug.log
+
+# Environment variables
+.env
+
+# Build output (Client)
+client/dist/
+client/build/
+
+# Local data & Uploads (Server)
+server/uploads/
+server/data.json
+server/firebase-service-account.json
+
+# OS generated files
+.DS_Store
+
+# Claude Code local config
+.claude/

@@ -1,0 +1,17 @@
+{
+  "short_name": "Superapp",
+  "name": "Superapp POS & Enterprise",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1033/1033016.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#3b82f6",
+  "background_color": "#fdfbf7",
+  "orientation": "portrait",
+  "description": "Aplikasi manajemen bisnis terintegrasi."
+}

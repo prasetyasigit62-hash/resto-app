@@ -1,0 +1,438 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. AUTH & USER & OUTLET MANAGEMENT
+// ==========================================
+
+enum Role {
+  OWNER
+  ADMIN
+  KASIR
+  CHEF
+}
+
+model Outlet {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  city        String
+  openTime    String   // format HH:mm
+  closeTime   String   // format HH:mm
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relasi
+  users           User[]
+  stocks          OutletStock[]
+  orders          Order[]
+  purchaseOrders  PurchaseOrder[]
+  stockMutations  StockMutation[]
+  expenses        Expense[]
+  tables          Table[]
+  reservations    Reservation[]
+  attendances     Attendance[]
+  shifts          Shift[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  password    String
+  role        Role
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  isVerified  Boolean  @default(true)
+  otpCode     String?
+  email       String?  @unique
+  bio         String?
+  image       String?
+  fcmToken    String?
+  addressBook String?  // JSON string
+  
+  // User terikat ke satu outlet (Kecuali Owner bisa melihat semua)
+  outletId    String?
+  outlet      Outlet?  @relation(fields: [outletId], references: [id])
+
+  // Relasi operasional
+  ordersProcessed Order[] @relation("KasirRelation")
+  ordersCooked    Order[] @relation("ChefRelation")
+  poCreated       PurchaseOrder[] @relation("POCreator")
+  poApproved      PurchaseOrder[] @relation("POApprover")
+  mutations       StockMutation[]
+  attendances     Attendance[]
+  shifts          Shift[]
+}
+
+// ==========================================
+// 3. INVENTORY MODULES & 7. PURCHASE ORDER
+// ==========================================
+
+enum Unit {
+  KG
+  LITER
+  PCS
+  GRAM
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  contact   String?
+  contactPerson String?
+  address   String?
+  
+  materials Material[]
+  pos       PurchaseOrder[]
+}
+
+model Material { // Bahan Baku
+  id          String   @id @default(uuid())
+  name        String
+  unit        Unit
+  lastPrice   Float    @default(0) // Harga beli terakhir
+  minStock    Float    @default(0) // Peringatan stok kritis
+  
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  
+  // Relasi
+  stocks      OutletStock[]
+  recipes     Recipe[]
+  poItems     POItem[]
+  mutations   StockMutation[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ==========================================
+// 5. STOK DAN MUTASI (Multi-Outlet)
+// ==========================================
+
+model OutletStock {
+  id          String   @id @default(uuid())
+  qty         Float    @default(0)
+  
+  outletId    String
+  outlet      Outlet   @relation(fields: [outletId], references: [id])
+  
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id])
+
+  @@unique([outletId, materialId]) // 1 Outlet hanya punya 1 record stok per bahan
+}
+
+enum MutationType {
+  IN_PO         // Masuk dari Purchase Order
+  IN_TRANSFER   // Masuk transfer antar outlet
+  OUT_SALES     // Keluar karena penjualan (Auto-deduct POS)
+  OUT_WASTE     // Keluar karena rusak/basi
+  OUT_TRANSFER  // Keluar transfer ke outlet lain
+  OPNAME_ADJ    // Penyesuaian Stock Opname manual
+}
+
+model StockMutation {
+  id          String       @id @default(uuid())
+  qty         Float        // Positif (masuk) atau Negatif (keluar)
+  type        MutationType
+  reference   String?      // ID Order POS atau ID PO
+  note        String?
+  createdAt   DateTime     @default(now())
+
+  outletId    String
+  outlet      Outlet       @relation(fields: [outletId], references: [id])
+  materialId  String
+  material    Material     @relation(fields: [materialId], references: [id])
+  userId      String       // Siapa yang melakukan mutasi / kasir
+  user        User         @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// 4. RESEP DAN MENU (BOM)
+// ==========================================
+
+model MenuCategory {
+  id    String @id @default(uuid())
+  name  String
+  menus Menu[]
+}
+
+model Menu {
+  id          String   @id @default(uuid())
+  name        String
+  price       Float
+  image       String?
+  isActive    Boolean  @default(true)
+  
+  categoryId  String?
+  category    MenuCategory? @relation(fields: [categoryId], references: [id])
+
+  recipes     Recipe[] // Komposisi (Bill of Materials)
+  orderItems  OrderItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Recipe {
+  id          String   @id @default(uuid())
+  qtyNeeded   Float    // Jumlah bahan yang dibutuhkan per 1 porsi menu
+  
+  menuId      String
+  menu        Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id])
+}
+
+// ==========================================
+// 6. OPERATIONAL (POS / TRANSAKSI)
+// ==========================================
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  DEBIT
+  CREDIT
+}
+
+enum OrderStatus {
+  PENDING
+  COOKING
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  receiptNumber String   @unique // Format generate: ORD-OUTLET-DATE-SEQ
+  total         Float
+  paymentMethod PaymentMethod
+  status        OrderStatus @default(PENDING)
+  createdAt     DateTime @default(now())
+
+  outletId      String
+  outlet        Outlet   @relation(fields: [outletId], references: [id])
+  
+  kasirId       String
+  kasir         User     @relation("KasirRelation", fields: [kasirId], references: [id])
+  
+  chefId        String?
+  chef          User?    @relation("ChefRelation", fields: [chefId], references: [id])
+
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id       String @id @default(uuid())
+  qty      Int
+  price    Float  // Harga saat transaksi terjadi (historical)
+  itemName String? // Menyimpan nama item jika pesanan manual/custom
+  
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuId   String?
+  menu     Menu?  @relation(fields: [menuId], references: [id])
+}
+
+// ==========================================
+// 7. PURCHASING (PO)
+// ==========================================
+
+enum POStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  RECEIVED
+  REJECTED
+}
+
+model PurchaseOrder {
+  id          String   @id @default(uuid())
+  poNumber    String   @unique
+  totalAmount Float    @default(0)
+  status      POStatus @default(DRAFT)
+  createdAt   DateTime @default(now())
+  
+  outletId    String
+  outlet      Outlet   @relation(fields: [outletId], references: [id])
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  
+  creatorId   String
+  creator     User     @relation("POCreator", fields: [creatorId], references: [id])
+  approverId  String?
+  approver    User?    @relation("POApprover", fields: [approverId], references: [id])
+
+  items       POItem[]
+}
+
+model POItem {
+  id          String   @id @default(uuid())
+  qty         Float
+  price       Float    // Harga kesepakatan PO
+  
+  poId        String
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  materialId  String
+  material    Material      @relation(fields: [materialId], references: [id])
+}
+
+// ==========================================
+// 8. FINANCE & EXPENSES (MIGRATED V2)
+// ==========================================
+model Expense {
+  id          String   @id @default(uuid())
+  date        DateTime @default(now())
+  category    String
+  amount      Float
+  description String
+  recordedBy  String
+
+  outletId    String?
+  outlet      Outlet?  @relation(fields: [outletId], references: [id])
+}
+
+// ==========================================
+// 9. CRM, CUSTOMERS, VOUCHERS (MIGRATED V2)
+// ==========================================
+model Customer {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?
+  points      Int      @default(0)
+  type        String   @default("silver")
+  createdAt   DateTime @default(now())
+}
+
+model Voucher {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  type        String   // "percent" or "nominal"
+  value       Float
+  minOrder    Float    @default(0)
+  isActive    Boolean  @default(true)
+  quota       Int      @default(-1)
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// 10. TABLES & RESERVATIONS (MIGRATED V2)
+// ==========================================
+model Table {
+  id          String   @id @default(uuid())
+  name        String
+  status      String   @default("Available")
+  x           Int      @default(0)
+  y           Int      @default(0)
+
+  outletId    String?
+  outlet      Outlet?  @relation(fields: [outletId], references: [id])
+  reservations Reservation[]
+}
+
+model Reservation {
+  id              String   @id @default(uuid())
+  customerName    String
+  contact         String?
+  reservationDate DateTime 
+  reservationTime String   
+  pax             Int
+  note            String?
+  status          String   @default("Pending")
+  paymentDeadline DateTime?
+  createdAt       DateTime @default(now())
+
+  tableId         String?
+  table           Table?   @relation(fields: [tableId], references: [id])
+  outletId        String?
+  outlet          Outlet?  @relation(fields: [outletId], references: [id])
+}
+
+// ==========================================
+// 11. HR, ATTENDANCE & SHIFTS (MIGRATED V2)
+// ==========================================
+model Attendance {
+  id             String   @id @default(uuid())
+  attendanceDate DateTime 
+  clockIn        DateTime @default(now())
+  clockOut       DateTime?
+
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  outletId       String?
+  outlet         Outlet?  @relation(fields: [outletId], references: [id])
+}
+
+model Shift {
+  id             String   @id @default(uuid())
+  startTime      DateTime @default(now())
+  endTime        DateTime?
+  startCash      Float
+  endCash        Float?
+  expectedCash   Float?
+  cashSales      Float?
+  nonCashSales   Float?
+  totalSales     Float?
+  cashInOp       Float?
+  cashOutOp      Float?
+  difference     Float?
+  status         String   @default("open")
+  transactionCount Int?   @default(0)
+
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  outletId       String?
+  outlet         Outlet?  @relation(fields: [outletId], references: [id])
+
+  movements      ShiftMovement[]
+}
+
+model ShiftMovement {
+  id          String   @id @default(uuid())
+  type        String   
+  amount      Float
+  note        String?
+  createdAt   DateTime @default(now())
+
+  shiftId     String
+  shift       Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  action      String
+  service     String
+  details     String
+}
+
+// ==========================================
+// 12. REVIEWS (MIGRATED V2)
+// ==========================================
+model Review {
+  id        String   @id @default(uuid())
+  itemId    String
+  userId    String
+  username  String
+  rating    Int
+  comment   String?
+  date      DateTime @default(now())
+}
+
+// ==========================================
+// 13. STORE SETTINGS (MIGRATED V2)
+// ==========================================
+model StoreSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
