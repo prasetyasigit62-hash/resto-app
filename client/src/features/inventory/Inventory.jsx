@@ -22,6 +22,12 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
     const [showProductStockModal, setShowProductStockModal] = useState(false);
     const [productStockForm, setProductStockForm] = useState({ id: '', name: '', stock: '' });
 
+    // ✨ Helper Format Rupiah Otomatis
+    const formatRupiah = (value) => {
+        if (!value) return '';
+        return String(value).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    };
+
     const fetchItems = async () => {
         const token = localStorage.getItem('resto_token');
         const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
@@ -67,11 +73,20 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
             ? `${backendUrl}/api/ingredients/${editItem.id}`
             : `${backendUrl}/api/ingredients`;
 
+        // ✨ FIX: Bersihkan payload dari object lama untuk mencegah bug konflik database
+        const payload = {
+            name: formData.name,
+            stock: Number(formData.stock),
+            unit: formData.unit,
+            min_stock: Number(formData.min_stock),
+            cost: Number(String(formData.cost).replace(/\./g, ''))
+        };
+
         try {
             const res = await fetch(url, {
                 method: editItem ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
             const result = await res.json().catch(() => ({}));
             if (res.ok) {
@@ -109,7 +124,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
 
     const openModal = (item = null) => {
         setEditItem(item);
-        setFormData(item ? { ...item } : { name: '', stock: '', unit: 'kg', min_stock: 5, cost: 0 });
+        setFormData(item ? { ...item, cost: formatRupiah(item.cost) } : { name: '', stock: '', unit: 'kg', min_stock: 5, cost: '' });
         setShowModal(true);
     };
 
@@ -153,10 +168,14 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
         const token = localStorage.getItem('resto_token');
         const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
         try {
+            const payload = {
+                ...restockForm,
+                cost: restockForm.cost ? Number(String(restockForm.cost).replace(/\./g, '')) : ''
+            };
             const res = await fetch(`${backendUrl}/api/inventory/restock`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(restockForm)
+                body: JSON.stringify(payload)
             });
             
             const data = await res.json();
@@ -549,7 +568,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
             </div>
 
             <label style={{display:'block', marginBottom:'8px', fontWeight:'600', fontSize:'0.9rem', marginTop:'15px', color:'#475569'}}>Harga Beli per Satuan (Rp)</label>
-            <input className="profile-input" type="number" value={formData.cost} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} placeholder="0" />
+            <input className="profile-input" type="text" value={formData.cost} onChange={e => setFormData({...formData, cost: formatRupiah(e.target.value)})} placeholder="0" />
 
             <label style={{display:'block', marginBottom:'8px', fontWeight:'600', fontSize:'0.9rem', marginTop: '15px', color:'#475569'}}>Batas Minimum (Alert)</label>
             <input className="profile-input" type="number" value={formData.min_stock} onChange={e => setFormData({...formData, min_stock: Number(e.target.value)})} />
@@ -629,7 +648,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
                                 setRestockForm({
                                     ...restockForm, 
                                     ingredientId: e.target.value,
-                                    cost: item ? item.cost : '' // Auto-fill harga lama
+                                    cost: item ? formatRupiah(item.cost) : '' // Auto-fill harga lama
                                 });
                             }}
                         >
@@ -646,7 +665,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
                             </div>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color:'#475569' }}>Harga Beli Baru</label>
-                                <input type="number" className="profile-input" value={restockForm.cost} onChange={e => setRestockForm({...restockForm, cost: e.target.value})} placeholder="Update Harga" />
+                                <input type="text" className="profile-input" value={restockForm.cost} onChange={e => setRestockForm({...restockForm, cost: formatRupiah(e.target.value)})} placeholder="Update Harga" />
                             </div>
                         </div>
 

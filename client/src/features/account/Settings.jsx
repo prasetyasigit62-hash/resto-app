@@ -14,7 +14,9 @@ const Settings = ({ user, onUpdateUser }) => {
     storePhone: '',
     receiptFooter: '',
     taxPercentage: 0,
-    serviceChargePercentage: 0
+    serviceChargePercentage: 0,
+    primaryColor: '#4f46e5', // ✨ Default Color
+    shrinkageTolerance: 5 // ✨ Parameter Pemakluman Fraud
   });
   const [loading, setLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -85,14 +87,30 @@ const Settings = ({ user, onUpdateUser }) => {
     setSavingSettings(true);
     const token = localStorage.getItem('resto_token');
     const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    
+    // ✨ FIX: Bersihkan payload untuk memastikan hanya 6 pengaturan utama yang dikirim dan tersimpan di DB
+    const payload = {
+      storeName: storeSettings.storeName || '',
+      storeAddress: storeSettings.storeAddress || '',
+      storePhone: storeSettings.storePhone || '',
+      receiptFooter: storeSettings.receiptFooter || '',
+      taxPercentage: Number(storeSettings.taxPercentage || 0),
+      serviceChargePercentage: Number(storeSettings.serviceChargePercentage || 0),
+      primaryColor: storeSettings.primaryColor || '#4f46e5',
+      shrinkageTolerance: Number(storeSettings.shrinkageTolerance || 5)
+    };
+
     try {
       const res = await fetch(`${backendUrl}/api/settings/store`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(storeSettings)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         toast.success('Konfigurasi toko berhasil disimpan!');
+        // ✨ SUNTIKKAN WARNA BARU KE SELURUH APLIKASI SECARA INSTAN
+        document.documentElement.style.setProperty('--primary-color', payload.primaryColor);
+        document.documentElement.style.setProperty('--primary-hover', payload.primaryColor + 'E6');
       } else {
         toast.error('Gagal menyimpan konfigurasi.');
       }
@@ -154,7 +172,7 @@ const Settings = ({ user, onUpdateUser }) => {
       </div>
 
       {/* ✨ BAGIAN PENGATURAN TOKO (Hanya Admin) */}
-      {user && user.role === 'admin' && (
+      {user && ['admin', 'superadmin', 'OWNER', 'ADMIN'].includes(String(user.role).toUpperCase()) && (
         <div style={{ 
           background: 'var(--card-bg)', 
           borderRadius: '16px', 
@@ -201,6 +219,27 @@ const Settings = ({ user, onUpdateUser }) => {
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-color)'}}>Pesan Footer Struk</label>
                         <input type="text" className="profile-input" value={storeSettings.receiptFooter} onChange={e => setStoreSettings({...storeSettings, receiptFooter: e.target.value})} placeholder="Terima kasih atas kunjungan Anda" />
+                    </div>
+                    
+                    <div style={{ gridColumn: '1 / -1', background: '#fef2f2', padding: '15px', borderRadius: '12px', border: '1px solid #fecaca' }}>
+                        <label style={{display: 'block', marginBottom: '5px', fontWeight: '800', fontSize: '0.9rem', color: '#b91c1c'}}>🚨 Toleransi Penyusutan / Pemakluman (%)</label>
+                        <span style={{ fontSize: '0.8rem', color: '#7f1d1d', display: 'block', marginBottom: '10px' }}>Batas wajar barang hilang/susut sebelum sistem mendeteksinya sebagai indikasi FRAUD atau Kecolongan.</span>
+                        <div style={{position: 'relative', width: '150px'}}>
+                            <input type="number" step="0.1" className="profile-input" value={storeSettings.shrinkageTolerance} onChange={e => setStoreSettings({...storeSettings, shrinkageTolerance: parseFloat(e.target.value)})} style={{paddingRight: '40px', background: 'white'}} />
+                            <span style={{position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 'bold'}}>%</span>
+                        </div>
+                    </div>
+                    
+                    {/* ✨ COLOR PICKER UNTUK TEMA DINAMIS */}
+                    <div style={{ gridColumn: '1 / -1', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <div>
+                            <label style={{display: 'block', marginBottom: '5px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-color)'}}>Warna Utama Aplikasi (Theme)</label>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pilih warna identitas yang sesuai dengan merek restoran Anda.</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginLeft: 'auto' }}>
+                            <input type="color" value={storeSettings.primaryColor || '#4f46e5'} onChange={e => setStoreSettings({...storeSettings, primaryColor: e.target.value})} style={{ width: '45px', height: '45px', padding: '0', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent' }} />
+                            <span style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1.1rem', background: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>{storeSettings.primaryColor || '#4f46e5'}</span>
+                        </div>
                     </div>
                 </div>
                 <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -255,7 +294,7 @@ const Settings = ({ user, onUpdateUser }) => {
       </div>
 
       {/* Area Khusus Admin: System Maintenance */}
-      {user && user.role === 'admin' && (
+      {user && ['admin', 'superadmin', 'OWNER', 'ADMIN'].includes(String(user.role).toUpperCase()) && (
         <div style={{ 
             background: '#fff1f2', /* Light Red bg for danger zone */
             borderRadius: '16px', 

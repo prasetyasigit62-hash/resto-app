@@ -57,6 +57,11 @@ export const usePos = (props) => {
   const [showQrisModal, setShowQrisModal] = useState(false);
   const [qrisStatus, setQrisStatus] = useState('waiting'); 
 
+  // ✨ MODAL CATATAN CEPAT (VARIAN)
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteItem, setNoteItem] = useState(null);
+  const [noteInput, setNoteInput] = useState('');
+
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     const socket = io(backendUrl);
@@ -175,7 +180,8 @@ export const usePos = (props) => {
   const cartTotals = useMemo(() => {
     const subtotal = activeCart.reduce((acc, item) => {
       const price = item.rawPrice || parseInt(String(item.price).replace(/[^0-9]/g, '') || '0');
-      return acc + (price * item.qty);
+      const qtyToCalc = isSplitMode ? (splitSelection[item.id] || 0) : item.qty;
+      return acc + (price * qtyToCalc);
     }, 0);
 
     let discountAmount = 0;
@@ -452,7 +458,8 @@ export const usePos = (props) => {
                     id: Date.now(), 
                     service: 'Restoran', 
                     message: `Pesanan #${order.id} dikonfirmasi Kasir -> Dapur`, 
-                    timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                action: 'UPDATE'
                 });
             }
         } else {
@@ -487,7 +494,8 @@ export const usePos = (props) => {
           id: Date.now(),
           service: 'Restoran',
           message: `Pesanan #${orderToPay.id} (${orderToPay.customerName}) telah LUNAS via ${method}.`,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          action: 'PAYMENT'
         });
       }
 
@@ -526,51 +534,110 @@ export const usePos = (props) => {
       <head>
         <title>Struk #${data.receiptNumber || data.id || 'NEW'}</title>
         <style>
-          body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; width: 100%; max-width: 300px; }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-          .bold { font-weight: bold; }
-          .border-bottom { border-bottom: 1px dashed #000; margin: 5px 0; padding-bottom: 5px; }
-          .row { display: flex; justify-content: space-between; }
-          .item-row { margin-bottom: 4px; }
+          @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+          body { 
+            font-family: 'Space Mono', 'Courier New', monospace; 
+            font-size: 12px; 
+            color: #000; 
+            margin: 0; 
+            padding: 10px; 
+            width: 100%; 
+            max-width: 320px; 
+            box-sizing: border-box;
+          }
+          .header { text-align: center; margin-bottom: 15px; }
+          .store-name { font-size: 20px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
+          .store-meta { font-size: 11px; color: #333; line-height: 1.4; }
+          .divider { border-top: 1px dashed #000; margin: 12px 0; }
+          .divider-bold { border-top: 2px solid #000; margin: 12px 0; }
+          .info-table { width: 100%; font-size: 11px; margin-bottom: 10px; }
+          .info-table td { padding: 2px 0; }
+          .info-label { color: #555; width: 40%; }
+          
+          .item-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          .item-table th { border-bottom: 1px solid #000; padding-bottom: 6px; font-size: 11px; text-align: right; font-weight: 700; }
+          .item-table th.left { text-align: left; }
+          .item-table td { padding: 8px 0; vertical-align: top; font-size: 11px; border-bottom: 1px dotted #ccc; }
+          .item-name { font-weight: 700; margin-bottom: 4px; font-size: 12px; }
+          .item-note { font-size: 10px; font-style: italic; color: #555; display: inline-block; background: #f0f0f0; padding: 2px 4px; border-radius: 4px; margin-top: 3px; }
+          .col-qty { width: 15%; text-align: center; font-weight: bold; }
+          .col-price { width: 30%; text-align: right; }
+          .col-total { width: 30%; text-align: right; font-weight: 700; }
+          
+          .summary-container { margin-top: 10px; padding-top: 5px; }
+          .summary-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+          .summary-row.grand-total { font-size: 18px; font-weight: 900; margin: 12px 0; padding: 12px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; }
+          
+          .footer { text-align: center; margin-top: 25px; font-size: 11px; line-height: 1.5; }
+          .footer-thanks { font-size: 14px; font-weight: 700; margin-bottom: 5px; letter-spacing: 1px; }
+          .watermark { margin-top: 15px; font-size: 9px; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
         </style>
       </head>
       <body>
-        <div class="text-center bold" style="font-size: 16px;">${storeSettings.storeName}</div>
-        <div class="text-center">${storeSettings.storeAddress}</div>
-        <div class="text-center border-bottom">Telp: ${storeSettings.storePhone}</div>
-        
-        <div>No. Order: ${data.receiptNumber || data.id}</div>
-        <div>Tgl: ${new Date().toLocaleString('id-ID')}</div>
-        <div>Kasir: ${props.user?.username || 'Staff'}</div>
-        ${data.chefName && data.chefName !== '-' ? `<div>Chef: ${data.chefName}</div>` : ''}
-        <div class="border-bottom">Metode: ${data.paymentMethod}</div>
-
-        <div class="items">
-          ${data.items.map(item => {
-      const priceNum = parseInt(String(item.price).replace(/[^0-9]/g, '') || '0');
-      return `
-              <div class="item-row">
-                <div>${item.name} x${item.qty}</div>
-                <div class="text-right">${(priceNum * item.qty).toLocaleString('id-ID')}</div>
-              </div>
-              ${item.note ? `<div style="font-size: 10px; font-style: italic; color: #555;">* ${item.note}</div>` : ''}
-            `;
-    }).join('')}
-        </div>
-
-        <div class="border-bottom" style="margin-top: 10px;"></div>
-        
-        <div class="row"><span>Subtotal</span><span>${(data.subtotal || 0).toLocaleString('id-ID')}</span></div>
-        ${data.discountAmount > 0 ? `<div class="row" style="color:red;"><span>Diskon ${data.voucherCode ? '('+data.voucherCode+')' : ''}</span><span>-${data.discountAmount.toLocaleString('id-ID')}</span></div>` : ''}
-        ${(data.serviceCharge || 0) > 0 ? `<div class="row"><span>Service (${storeSettings.serviceChargePercentage}%)</span><span>${Math.round(data.serviceCharge).toLocaleString('id-ID')}</span></div>` : ''}
-        <div class="row"><span>PPN (${storeSettings.taxPercentage}%)</span><span>${Math.round(data.tax || 0).toLocaleString('id-ID')}</span></div>
-        ${data.pointsDiscount > 0 ? `<div class="row" style="color:green;"><span>Tukar Poin</span><span>-${data.pointsDiscount.toLocaleString('id-ID')}</span></div>` : ''}
-        <div class="row bold" style="font-size: 14px; margin-top: 5px;"><span>TOTAL</span><span>Rp ${(data.total || 0).toLocaleString('id-ID')}</span></div>
-        
-        <div class="text-center border-bottom" style="margin-top: 15px;"></div>
-        <div class="text-center" style="margin-top: 10px;">Terima Kasih</div>
-        <div class="text-center">Simpan struk ini sebagai bukti pembayaran.</div>
+         <div class="header">
+           <div class="store-name">${storeSettings.storeName}</div>
+           <div class="store-meta">${storeSettings.storeAddress || ''}</div>
+           <div class="store-meta">Telp: ${storeSettings.storePhone || '-'}</div>
+         </div>
+         
+         <div class="divider"></div>
+         
+         <table class="info-table">
+            <tr><td class="info-label">No. Resi</td><td>: <strong>${data.receiptNumber || data.id || 'NEW'}</strong></td></tr>
+            <tr><td class="info-label">Tanggal</td><td>: ${new Date().toLocaleString('id-ID')}</td></tr>
+            <tr><td class="info-label">Kasir</td><td>: ${props.user?.username || 'Staff'}</td></tr>
+            ${data.customerName ? `<tr><td class="info-label">Pelanggan</td><td>: <strong>${data.customerName}</strong></td></tr>` : ''}
+            <tr><td class="info-label">Pembayaran</td><td>: <strong>${data.paymentMethod}</strong></td></tr>
+         </table>
+         
+         <div class="divider-bold"></div>
+         
+         <table class="item-table">
+           <thead>
+             <tr>
+               <th class="left" style="width: 35%;">Item</th>
+               <th class="col-qty">Qty</th>
+               <th class="col-price">Harga</th>
+               <th class="col-total">Total</th>
+             </tr>
+           </thead>
+           <tbody>
+             ${data.items.map(item => {
+               const priceNum = parseInt(String(item.price).replace(/[^0-9]/g, '') || '0');
+               const itemTotal = priceNum * item.qty;
+               return `
+                 <tr>
+                   <td class="left">
+                     <div class="item-name">${item.name}</div>
+                     ${item.note ? `<div class="item-note">${item.note}</div>` : ''}
+                   </td>
+                   <td class="col-qty">${item.qty}x</td>
+                   <td class="col-price">${priceNum.toLocaleString('id-ID')}</td>
+                   <td class="col-total">${itemTotal.toLocaleString('id-ID')}</td>
+                 </tr>
+               `;
+             }).join('')}
+           </tbody>
+         </table>
+         
+         <div class="summary-container">
+            <div class="summary-row"><span>Subtotal</span><span>${(data.subtotal || 0).toLocaleString('id-ID')}</span></div>
+            ${data.discountAmount > 0 ? `<div class="summary-row"><span>Diskon ${data.voucherCode ? '('+data.voucherCode+')' : ''}</span><span>-${data.discountAmount.toLocaleString('id-ID')}</span></div>` : ''}
+            ${(data.serviceCharge || 0) > 0 ? `<div class="summary-row"><span>Service (${storeSettings.serviceChargePercentage}%)</span><span>${Math.round(data.serviceCharge).toLocaleString('id-ID')}</span></div>` : ''}
+            <div class="summary-row"><span>PPN (${storeSettings.taxPercentage}%)</span><span>${Math.round(data.tax || 0).toLocaleString('id-ID')}</span></div>
+            ${data.pointsDiscount > 0 ? `<div class="summary-row"><span>Tukar Poin</span><span>-${data.pointsDiscount.toLocaleString('id-ID')}</span></div>` : ''}
+            
+            <div class="summary-row grand-total">
+               <span>TOTAL</span>
+               <span>Rp ${(data.total || 0).toLocaleString('id-ID')}</span>
+            </div>
+         </div>
+         
+         <div class="footer">
+            <div class="footer-thanks">TERIMA KASIH</div>
+            <div>${storeSettings.receiptFooter || 'Silakan datang kembali!'}</div>
+            <div class="watermark">Powered by Superapp POS</div>
+         </div>
       </body>
       </html>
     `;
@@ -605,36 +672,47 @@ export const usePos = (props) => {
       <head>
         <title>KITCHEN CHECKER #${data.orderId || 'NEW'}</title>
         <style>
-          body { font-family: 'Courier New', monospace; font-size: 14px; margin: 0; padding: 10px; width: 100%; max-width: 300px; font-weight: bold; }
+          @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+          body { 
+            font-family: 'Space Mono', 'Courier New', monospace; 
+            font-size: 14px; 
+            margin: 0; 
+            padding: 10px; 
+            width: 100%; 
+            max-width: 300px; 
+            font-weight: bold; 
+          }
           .text-center { text-align: center; }
-          .border-bottom { border-bottom: 2px dashed #000; margin: 10px 0; padding-bottom: 10px; }
-          .header { font-size: 18px; text-transform: uppercase; margin-bottom: 5px; }
-          .meta { font-size: 12px; font-weight: normal; margin-bottom: 2px; }
-          .item-row { margin-bottom: 15px; display: flex; align-items: flex-start; }
-          .qty { font-size: 22px; width: 40px; margin-right: 10px; }
-          .name { flex: 1; font-size: 16px; }
-          .note { display: block; font-size: 12px; font-style: italic; margin-top: 4px; font-weight: normal; background: #eee; padding: 2px; }
+          .border-bottom { border-bottom: 2px dashed #000; margin: 12px 0; padding-bottom: 12px; }
+          .header { font-size: 22px; text-transform: uppercase; margin-bottom: 5px; font-weight: 900; background: #000; color: #fff; padding: 5px; }
+          .table-name { font-size: 26px; margin: 10px 0; border: 2px solid #000; padding: 5px; display: inline-block; }
+          .meta { font-size: 12px; font-weight: normal; margin-bottom: 4px; }
+          .item-row { margin-bottom: 18px; display: flex; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+          .qty { font-size: 24px; width: 45px; margin-right: 15px; background: #000; color: #fff; text-align: center; border-radius: 4px; padding: 2px 0; }
+          .name { flex: 1; font-size: 18px; line-height: 1.3; }
+          .note { display: block; font-size: 15px; margin-top: 8px; font-weight: bold; border: 2px dashed #000; padding: 8px; background: #f9f9f9; }
         </style>
       </head>
       <body>
         <div class="text-center header">PESANAN DAPUR</div>
         <div class="text-center border-bottom">
-            <div style="font-size: 22px; margin-bottom: 5px;">${data.table}</div>
+            <div class="table-name">${data.table}</div>
             <div class="meta">${new Date().toLocaleString('id-ID')}</div>
             <div class="meta">Ref: #${data.orderId || '-'}</div>
         </div>
         <div class="items">
           ${data.items.map(item => `
             <div class="item-row">
-              <div class="qty">${item.qty}</div>
+              <div class="qty">${item.qty}x</div>
               <div class="name">
-                ${item.name}
-                ${item.note ? `<span class="note">Note: ${item.note}</span>` : ''}
+                <div>${item.name}</div>
+                ${item.note ? `<div class="note">⚠️ ${item.note}</div>` : ''}
               </div>
             </div>
           `).join('')}
         </div>
         <div class="border-bottom" style="margin-top: 20px;"></div>
+        <div class="text-center meta">*** END OF ORDER ***</div>
       </body>
       </html>
     `;
@@ -703,24 +781,19 @@ export const usePos = (props) => {
   };
 
   const handleEditNote = (item) => {
-    setConfirmModal({
-      show: true,
-      title: `Catatan: ${item.name}`,
-      message: 'Tambahkan instruksi khusus untuk dapur (Contoh: Tidak pedas, extra saus, dll).',
-      inputType: 'textarea', 
-      inputPlaceholder: 'Tulis catatan di sini...',
-      inputValue: item.note, 
-      confirmText: 'Simpan Catatan',
-      cancelText: 'Batal',
-      onConfirmWithValue: (newNote) => {
-        setActiveCart(prevCart => prevCart.map(cartItem =>
-          cartItem.id === item.id ? { ...cartItem, note: newNote } : cartItem
-        ));
-        setConfirmModal(prev => ({ ...prev, show: false }));
-        if (newNote) toast.success('Catatan disimpan!');
-        else toast.info('Catatan dihapus.');
-      }
-    });
+    setNoteItem(item);
+    setNoteInput(item.note || '');
+    setShowNoteModal(true);
+  };
+
+  const saveNote = (overrideNote) => {
+    const finalNote = typeof overrideNote === 'string' ? overrideNote : noteInput;
+    setActiveCart(prevCart => prevCart.map(cartItem =>
+      cartItem.id === noteItem.id ? { ...cartItem, note: finalNote } : cartItem
+    ));
+    setShowNoteModal(false);
+    if (finalNote) toast.success('Catatan & Varian disimpan!');
+    else toast.info('Catatan dihapus.');
   };
 
   const applyDiscount = () => {
@@ -883,7 +956,8 @@ export const usePos = (props) => {
             id: Date.now(),
             service: 'Restoran',
             message: `Pesanan #${resultData.order?.receiptNumber || resultData.orderId} (${selectedTable ? selectedTable.name : 'Takeaway'}) - ${paymentMsg}. Total: Rp ${cartTotals.total.toLocaleString('id-ID')}`,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            action: paymentMethod === 'Open Bill' ? 'NEW ORDER' : 'PAYMENT'
           });
         }
 
@@ -937,6 +1011,6 @@ export const usePos = (props) => {
   };
 
   return {
-    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
+    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, showNoteModal, setShowNoteModal, noteItem, setNoteItem, noteInput, setNoteInput, saveNote, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
   };
 };

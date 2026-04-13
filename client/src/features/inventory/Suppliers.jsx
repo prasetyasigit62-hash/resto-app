@@ -30,7 +30,8 @@ const Suppliers = ({ setConfirmModal }) => {
 
   const openModal = (item = null) => {
     setEditingItem(item);
-    setFormData(item ? { ...item } : { name: '', phone: '', address: '', contactPerson: '' });
+    // ✨ FIX: Ambil data 'contact' dari V2 jika 'phone' tidak ada
+    setFormData(item ? { ...item, phone: item.contact || item.phone || '' } : { name: '', phone: '', address: '', contactPerson: '' });
     setShowModal(true);
   };
 
@@ -44,11 +45,19 @@ const Suppliers = ({ setConfirmModal }) => {
         ? `${backendUrl}/api/v2/suppliers/${editingItem.id}`
         : `${backendUrl}/api/v2/suppliers`;
 
+    // ✨ FIX: Bersihkan payload agar sisa data lama tidak menimpa data baru
+    const payload = {
+      name: formData.name,
+      phone: formData.phone,
+      address: formData.address,
+      contactPerson: formData.contactPerson
+    };
+
     try {
       const res = await fetch(url, {
         method: editingItem ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -121,7 +130,8 @@ const Suppliers = ({ setConfirmModal }) => {
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <span style={{ minWidth: '20px' }}>📞</span> 
-                    {s.phone || '-'}
+                    {/* ✨ FIX: Tampilkan 'contact' dari V2 jika ada */}
+                    {s.contact || s.phone || '-'}
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <span style={{ minWidth: '20px' }}>📍</span> 

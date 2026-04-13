@@ -390,7 +390,7 @@ app.put('/api/v2/purchase-orders/:id/status', authenticateToken, authorizeRole([
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/v2/users', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'CHEF', 'KASIR']), async (req, res) => {
+app.get('/api/v2/users', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'CHEF', 'KASIR', 'WAITER']), async (req, res) => {
   try { res.json(await prisma.user.findMany({ select: { id: true, username: true, role: true, isActive: true, outletId: true, outlet: true }})); } 
   catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -562,6 +562,65 @@ app.get('/api/v2/reports/outlets-comparison', authenticateToken, authorizeRole([
   } catch(e) { res.status(500).json({error: e.message}); }
 });
 
+// ✨ NEW KRUSIAL: FRAUD & SHRINKAGE ANALYTICS ENGINE
+app.get('/api/v2/reports/fraud', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'SUPERADMIN']), async (req, res) => {
+  try {
+    const { startDate, endDate, outletId } = req.query;
+    let whereClause = {};
+    if (outletId && outletId !== 'ALL') whereClause.outletId = outletId;
+    if (startDate && endDate) {
+        whereClause.createdAt = { gte: new Date(startDate), lte: new Date(endDate + 'T23:59:59Z') };
+    }
+
+    // Ambil parameter pemakluman (Toleransi Susut)
+    const settingsRes = await pool.query("SELECT value FROM store_settings WHERE key = 'shrinkageTolerance'");
+    const tolerancePercent = settingsRes.rows.length > 0 ? Number(settingsRes.rows[0].value) : 5;
+
+    // Ambil semua pergerakan stok (Mutasi)
+    const mutations = await prisma.stockMutation.findMany({
+        where: whereClause,
+        include: { material: true, outlet: true, user: { select: { username: true } } }
+    });
+
+    const analysis = {};
+    mutations.forEach(m => {
+        const key = `${m.outletId}_${m.materialId}`;
+        if (!analysis[key]) {
+            analysis[key] = {
+                outletName: m.outlet.name, materialName: m.material.name, unit: m.material.unit,
+                cost: m.material.lastPrice || 0,
+                totalSalesUsage: 0, totalWaste: 0, totalMissing: 0,
+                suspectUsers: new Set()
+            };
+        }
+        
+        if (m.type === 'OUT_SALES') analysis[key].totalSalesUsage += Math.abs(m.qty);
+        else if (m.type === 'OUT_WASTE') analysis[key].totalWaste += Math.abs(m.qty);
+        else if (m.type === 'OPNAME_ADJ' && m.qty < 0) {
+            analysis[key].totalMissing += Math.abs(m.qty); // Barang hilang saat opname
+            if (m.user) analysis[key].suspectUsers.add(m.user.username); // Siapa yang opname
+        }
+    });
+
+    const report = Object.values(analysis).map(item => {
+        const expectedOut = item.totalSalesUsage + item.totalWaste;
+        const totalMovement = expectedOut + item.totalMissing;
+        // Persentase susut = (Hilang / Total Barang yang Keluar) * 100
+        const lossRate = totalMovement > 0 ? (item.totalMissing / totalMovement) * 100 : 0;
+        
+        const isFraud = lossRate > tolerancePercent && item.totalMissing > 0;
+        const financialLoss = item.totalMissing * item.cost;
+
+        return {
+            ...item, suspectUsers: Array.from(item.suspectUsers).join(', '),
+            lossRate: lossRate.toFixed(2), isFraud, financialLoss
+        };
+    }).filter(item => item.totalMissing > 0); // Hanya lacak yang ada barang hilang
+
+    res.json({ tolerancePercent, report: report.sort((a, b) => b.financialLoss - a.financialLoss) });
+  } catch(e) { res.status(500).json({error: e.message}); }
+});
+
 // ==========================================
 // ✨ FASE BARU: REAL AI BUSINESS INSIGHTS
 // ==========================================
@@ -626,7 +685,7 @@ app.get('/api/v2/analytics/smart-insights', authenticateToken, authorizeRole(['O
 // ✨ FASE 6: POS & TRANSAKSI V2 (BOM AUTO-DEDUCT)
 // ==========================================
 
-app.post(['/api/orders', '/api/v2/orders', '/api/public/orders'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'KASIR', 'user']), async (req, res) => {
+app.post(['/api/orders', '/api/v2/orders', '/api/public/orders'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'KASIR', 'user', 'WAITER']), async (req, res) => {
   const { items, total, paymentMethod, chefId, address, customerNameOverride, memberId, voucherCode, redeemPoints } = req.body;
   const outletId = req.user.outletId;
   
@@ -720,6 +779,12 @@ app.post(['/api/orders', '/api/v2/orders', '/api/public/orders'], authenticateTo
 
       return order;
     });
+
+    // ✨ FIX NOTIFIKASI: Catat transaksi ke Activity Log agar muncul di Lonceng
+    logActivity('NEW ORDER', 'Restoran', `Pesanan #${receiptNumber} (${statusEnum}) - Rp ${Number(total).toLocaleString('id-ID')}`);
+    
+    // ✨ FIX NOTIFIKASI: Beri sinyal Real-time WebSocket ke Kasir / Dapur / Perangkat lain
+    io.emit('newOrder', { orderId: newOrder.id });
 
     res.status(201).json({ message: 'Transaksi berhasil', orderId: newOrder.id, order: newOrder });
   } catch (err) {
@@ -1044,6 +1109,7 @@ const initializeAndMigrateData = async () => {
       CREATE TABLE IF NOT EXISTS attendance (id BIGSERIAL PRIMARY KEY, user_id VARCHAR(255), attendance_date DATE, clock_in TIMESTAMP WITH TIME ZONE, clock_out TIMESTAMP WITH TIME ZONE);
       CREATE TABLE IF NOT EXISTS orders (id BIGINT PRIMARY KEY, date TIMESTAMP WITH TIME ZONE, customer_id VARCHAR(100), customer_name VARCHAR(255), address TEXT, total NUMERIC, payment_method VARCHAR(50), voucher_code VARCHAR(50), status VARCHAR(50), items TEXT, seller_name VARCHAR(100), seller_id VARCHAR(100), payment_session_id VARCHAR(100), tracking_number VARCHAR(100), processed_by VARCHAR(100), return_reason TEXT, return_image TEXT);
       CREATE TABLE IF NOT EXISTS restaurant_reservations (id BIGSERIAL PRIMARY KEY, customer_name VARCHAR(255), contact VARCHAR(100), reservation_date DATE, reservation_time TIME, pax INT, table_id BIGINT, note TEXT, status VARCHAR(50) DEFAULT 'Pending', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS app_menus (id SERIAL PRIMARY KEY, title VARCHAR(100), icon VARCHAR(50), service_name VARCHAR(100), allowed_roles TEXT, sort_order INT, category VARCHAR(100));
     `);
 
     // ✨ NEW: Auto-create tabel log untuk Inventori
@@ -1106,6 +1172,15 @@ const initializeAndMigrateData = async () => {
             await pool.query("UPDATE users SET password = $1, role = 'OWNER' WHERE username = 'owner'", [hashedPassword]);
             console.log('✅ Sandi OWNER dipaksa reset ke default (user: owner, pass: owner123).');
         }
+        
+        // ✨ SINKRONISASI KE PRISMA V2 (Mengatasi Isu Invalid Password)
+        try {
+            await prisma.user.upsert({
+                where: { username: 'owner' },
+                update: { password: hashedPassword, role: 'OWNER', isActive: true },
+                create: { username: 'owner', password: hashedPassword, role: 'OWNER', isActive: true }
+            });
+        } catch(e) {}
     } catch(e) { console.log('⚠️ Gagal auto-seed owner.', e.message); }
 
     // ✨ FIX: Auto-seed Admin User (Pastikan selalu ada terlepas dari user lain)
@@ -1120,6 +1195,15 @@ const initializeAndMigrateData = async () => {
             await pool.query("UPDATE users SET password = $1, role = 'superadmin' WHERE username = 'admin'", [hashedPasswordAdmin]);
             console.log('✅ Sandi ADMIN dipaksa reset ke default (user: admin, pass: admin123).');
         }
+        
+        // ✨ SINKRONISASI KE PRISMA V2
+        try {
+            await prisma.user.upsert({
+                where: { username: 'admin' },
+                update: { password: hashedPasswordAdmin, role: 'ADMIN', isActive: true },
+                create: { username: 'admin', password: hashedPasswordAdmin, role: 'ADMIN', isActive: true }
+            });
+        } catch(e) {}
     } catch(e) { console.log('⚠️ Gagal auto-seed admin.', e.message); }
 
     // Migrasi Ingredients
@@ -1176,7 +1260,8 @@ const initializeAndMigrateData = async () => {
         storePhone: '021-12345678',
         receiptFooter: 'Terima kasih atas kunjungan Anda.',
         taxPercentage: 11,
-        serviceChargePercentage: 0
+        serviceChargePercentage: 0,
+        shrinkageTolerance: 5
       };
       for (const key in settings) {
         await pool.query('INSERT INTO store_settings (key, value) VALUES ($1, $2)', [key, settings[key]]);
@@ -1193,6 +1278,45 @@ const initializeAndMigrateData = async () => {
         await pool.query('INSERT INTO tables (name, status, x, y) VALUES ($1, $2, $3, $4)', [`Meja ${i}`, 'Available', ((i-1) % 5) * 120 + 20, Math.floor((i-1) / 5) * 120 + 20]);
       }
       console.log(`[MIGRASI] 10 Meja default berhasil dibuat ke DB.`);
+    }
+
+    // ✨ FASE ENTERPRISE: Auto-seed Menu Dinamis ke Database
+    const menusCount = await pool.query('SELECT COUNT(*) FROM app_menus');
+    if (parseInt(menusCount.rows[0].count) === 0) {
+      const defaultMenus = [
+        ['Dashboard KPI', '📊', 'DashboardKPI', '["OWNER","ADMIN","SUPERADMIN"]', 1, 'ANALITIK & KEUANGAN'],
+        ['Laporan Penjualan', '📊', 'SalesReport', '["OWNER","ADMIN","SUPERADMIN"]', 2, 'ANALITIK & KEUANGAN'],
+        ['Keuangan (P&L)', '💼', 'Finance', '["OWNER","ADMIN","SUPERADMIN"]', 3, 'ANALITIK & KEUANGAN'],
+        ['Komparasi Outlet', '🏢', 'OutletComparisonV2', '["OWNER","SUPERADMIN"]', 4, 'ANALITIK & KEUANGAN'],
+        ['Smart Insight', '🧠', 'AiInsights', '["OWNER","ADMIN","SUPERADMIN"]', 5, 'ANALITIK & KEUANGAN'],
+        ['Laporan Shift Kasir', '🔐', 'ShiftReport', '["OWNER","ADMIN","SUPERADMIN","KASIR"]', 6, 'ANALITIK & KEUANGAN'],
+        ['Kasir & POS', '📠', 'POS', '["OWNER","ADMIN","SUPERADMIN","KASIR","WAITER"]', 7, 'OPERASIONAL RESTORAN'],
+        ['Reservasi Meja', '📅', 'Reservations', '["OWNER","ADMIN","SUPERADMIN","KASIR","WAITER"]', 8, 'OPERASIONAL RESTORAN'],
+        ['Kitchen Display', '👨‍🍳', 'KitchenView', '["OWNER","ADMIN","SUPERADMIN","CHEF"]', 9, 'OPERASIONAL RESTORAN'],
+        ['Manajemen Meja & QR', '🪑', 'Tables', '["OWNER","ADMIN","SUPERADMIN","WAITER"]', 10, 'OPERASIONAL RESTORAN'],
+        ['Resep, BOM & Margin', '🍲', 'MenuBOM', '["OWNER","ADMIN","SUPERADMIN"]', 11, 'INVENTORI & PRODUK'],
+        ['Master Bahan Baku', '🌾', 'InventoryV2', '["OWNER","ADMIN","SUPERADMIN"]', 12, 'INVENTORI & PRODUK'],
+        ['Stok & Opname', '📦', 'StockOpname', '["OWNER","ADMIN","SUPERADMIN"]', 13, 'INVENTORI & PRODUK'],
+        ['Pembelian (PO)', '🛒', 'PurchaseOrder', '["OWNER","ADMIN","SUPERADMIN"]', 14, 'INVENTORI & PRODUK'],
+        ['Data Supplier', '🚚', 'Suppliers', '["OWNER","ADMIN","SUPERADMIN"]', 15, 'INVENTORI & PRODUK'],
+        ['CRM & Pelanggan', '👑', 'CRM', '["OWNER","ADMIN","SUPERADMIN"]', 16, 'SDM & PELANGGAN'],
+        ['Voucher & Promo', '🎟️', 'Vouchers', '["OWNER","ADMIN","SUPERADMIN"]', 17, 'SDM & PELANGGAN'],
+        ['Manajemen Pegawai', '👥', 'UserManagementV2', '["OWNER","ADMIN","SUPERADMIN"]', 18, 'SDM & PELANGGAN'],
+        ['Manajemen Cabang', '🏪', 'OutletManagement', '["OWNER","ADMIN","SUPERADMIN"]', 19, 'SDM & PELANGGAN'],
+        ['Pengaturan Toko', '⚙️', 'Settings', '["OWNER","ADMIN","SUPERADMIN"]', 20, 'PENGATURAN SISTEM'],
+        ['Absensi Kehadiran', '⏱️', 'Attendance', '["OWNER","ADMIN","SUPERADMIN","KASIR","CHEF","USER","WAITER"]', 21, 'UMUM']
+      ];
+      for (const m of defaultMenus) {
+          await pool.query('INSERT INTO app_menus (title, icon, service_name, allowed_roles, sort_order, category) VALUES ($1, $2, $3, $4, $5, $6)', m);
+      }
+      console.log(`[MIGRASI] ${defaultMenus.length} Menu Navigasi Dinamis ditambahkan ke DB.`);
+    } else {
+      // ✨ PATCH: Suntikkan Role WAITER ke Menu yang sudah terlanjur ada di DB
+      try {
+        await pool.query(`UPDATE app_menus SET allowed_roles = '["OWNER","ADMIN","SUPERADMIN","KASIR","WAITER"]' WHERE service_name IN ('POS', 'Reservations')`);
+        await pool.query(`UPDATE app_menus SET allowed_roles = '["OWNER","ADMIN","SUPERADMIN","WAITER"]' WHERE service_name = 'Tables'`);
+        await pool.query(`UPDATE app_menus SET allowed_roles = '["OWNER","ADMIN","SUPERADMIN","KASIR","CHEF","USER","WAITER"]' WHERE service_name = 'Attendance'`);
+      } catch(e) {}
     }
 
   } catch (err) { console.error('Gagal inisialisasi data:', err); }
@@ -1220,6 +1344,7 @@ const syncV2User = async (user) => {
             if (r === 'OWNER' || r === 'SUPERADMIN') v2Role = 'OWNER';
             else if (r === 'ADMIN') v2Role = 'ADMIN';
             else if (r === 'CHEF') v2Role = 'CHEF';
+            else if (r === 'WAITER') v2Role = 'WAITER';
             await prisma.user.create({ data: { id: uid, username: user.username || 'System', password: 'migrated', role: v2Role } });
         }
     } catch(e) {}
@@ -1479,8 +1604,8 @@ app.post('/api/expenses', authenticateToken, authorizeRole(['admin', 'superadmin
 });
 
 
-// Endpoint khusus untuk Activity Log
-app.get('/api/system/activity-log', authenticateToken, authorizeRole(['admin', 'superadmin', 'ADMIN', 'OWNER', 'SUPERADMIN']), async (req, res) => {
+// ✨ FIX NOTIFIKASI: Buka akses log notifikasi untuk Kasir, Waiter, dan Chef
+app.get('/api/system/activity-log', authenticateToken, authorizeRole(['admin', 'superadmin', 'ADMIN', 'OWNER', 'SUPERADMIN', 'KASIR', 'WAITER', 'CHEF']), async (req, res) => {
   try {
     // Ambil 100 log terbaru dari database
     const result = await pool.query('SELECT * FROM activity_log ORDER BY timestamp DESC LIMIT 100');
@@ -1605,24 +1730,85 @@ app.post('/api/settings/store', authenticateToken, authorizeRole(['admin', 'supe
   res.json({ message: 'Pengaturan berhasil disimpan.', settings: newSettings });
 });
 
+// ✨ NEW: API Public Settings (Untuk menarik Warna Tema sebelum/setelah Login)
+app.get('/api/public/settings', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM store_settings WHERE key IN ('primaryColor', 'storeName')");
+    const settings = result.rows.reduce((acc, row) => { acc[row.key] = row.value; return acc; }, {});
+    res.json(settings);
+  } catch(e) { res.status(500).json({}); }
+});
+
+// ✨ NEW: API Dynamic Menus (Hanya menampilkan menu yang diizinkan untuk jabatannya)
+app.get('/api/system/menus', authenticateToken, async (req, res) => {
+  try {
+    const userRole = String(req.user.role).toUpperCase();
+    const result = await pool.query('SELECT * FROM app_menus ORDER BY sort_order ASC');
+    
+    const allowedMenus = result.rows.filter(menu => {
+        try { const roles = JSON.parse(menu.allowed_roles); return roles.includes(userRole); } catch(e) { return false; }
+    });
+    
+    const grouped = allowedMenus.reduce((acc, menu) => {
+        if (!acc[menu.category]) acc[menu.category] = [];
+        acc[menu.category].push(menu);
+        return acc;
+    }, {});
+    res.json(grouped);
+  } catch(e) { res.status(500).json({error: e.message}); }
+});
+
 // Endpoint Backup Database (Download data.json)
-app.get('/api/system/backup', authenticateToken, authorizeRole(['admin']), (req, res) => {
-  const filePath = path.join(__dirname, 'data.json');
-  res.download(filePath, `restoran_backup_${Date.now()}.json`);
+app.get('/api/system/backup', authenticateToken, authorizeRole(['admin', 'superadmin', 'OWNER', 'ADMIN']), async (req, res) => {
+  try {
+    const v1Data = readData(); // Data legacy lama
+    
+    // ✨ V2 BACKUP: Tarik SEMUA data krusial dari database PostgreSQL
+    const v2Data = {
+      users: await prisma.user.findMany(),
+      outlets: await prisma.outlet.findMany(),
+      materials: await prisma.material.findMany(),
+      menus: await prisma.menu.findMany(),
+      outletStocks: await prisma.outletStock.findMany(),
+      stockMutations: await prisma.stockMutation.findMany(),
+      orders: await prisma.order.findMany(),
+      suppliers: await prisma.supplier.findMany(),
+      purchaseOrders: await prisma.purchaseOrder.findMany()
+    };
+
+    const fullBackup = {
+      timestamp: new Date().toISOString(),
+      v1_legacy: v1Data,
+      v2_postgres: v2Data
+    };
+
+    const fileName = `superapp_full_backup_${Date.now()}.json`;
+    const filePath = path.join(__dirname, 'uploads', fileName);
+    
+    // Tulis file sementara ke disk, lalu kirim ke client
+    fs.writeFileSync(filePath, JSON.stringify(fullBackup, null, 2));
+    
+    res.download(filePath, fileName, (err) => {
+      if (!err) fs.unlinkSync(filePath); // Bersihkan file otomatis setelah sukses didownload
+    });
+  } catch (err) { res.status(500).json({ error: 'Gagal melakukan kompilasi backup database V2.' }); }
 });
 
 // Endpoint Restore Database (Upload JSON body)
-app.post('/api/system/restore', authenticateToken, authorizeRole(['admin']), (req, res) => {
+app.post('/api/system/restore', authenticateToken, authorizeRole(['admin', 'superadmin', 'OWNER', 'ADMIN']), (req, res) => {
   const newData = req.body;
+  
+  // ✨ CERDAS: Ekstrak hanya data V1 jika user mengupload "Super Backup" yang baru
+  const dataToRestore = newData.v1_legacy ? newData.v1_legacy : newData;
 
   // Validasi sederhana struktur data
-  if (!newData.users || !Array.isArray(newData.users)) {
+  if (!dataToRestore.users || !Array.isArray(dataToRestore.users)) {
     return res.status(400).json({ error: 'Format backup tidak valid (Data Users tidak ditemukan).' });
   }
 
-  writeData(newData);
-  logActivity('RESTORE', 'system', 'Admin melakukan restore database.');
-  res.json({ message: 'Database berhasil direstore.' });
+  writeData(dataToRestore);
+  logActivity('RESTORE', 'system', 'Admin melakukan restore database legacy V1.');
+  res.json({ message: 'Data konfigurasi dasar direstore. (Data Transaksi V2 diabaikan demi keamanan relasi DB).' });
 });
 
 // Endpoint Upload Gambar
@@ -1952,7 +2138,7 @@ app.post('/api/users/addresses', authenticateToken, async (req, res) => {
 });
 
 // Endpoint Get All Orders (Untuk Admin, Staff, & Kitchen Display KDS)
-app.get(['/api/orders', '/api/v2/orders/history'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'staff', 'CHEF', 'KASIR']), async (req, res) => {
+app.get(['/api/orders', '/api/v2/orders/history'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'staff', 'CHEF', 'KASIR', 'WAITER']), async (req, res) => {
   try {
     // ✨ AUTO-CREATE TABLE JIKA BELUM ADA UNTUK MENCEGAH ERROR 500
     await pool.query(`
@@ -2053,7 +2239,7 @@ app.get('/api/orders/my-history', authenticateToken, async (req, res) => {
 
 
 // Endpoint Update Status Order (Proses Pesanan)
-app.put(['/api/orders/:id/status', '/api/v2/orders/:id/status'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'staff', 'CHEF', 'KASIR']), async (req, res) => {
+app.put(['/api/orders/:id/status', '/api/v2/orders/:id/status'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'staff', 'CHEF', 'KASIR', 'WAITER']), async (req, res) => {
   const { id } = req.params;
   const { status, processedBy } = req.body;
 
@@ -2165,7 +2351,7 @@ app.put(['/api/orders/:id/status', '/api/v2/orders/:id/status'], authenticateTok
 });
 
 // Endpoint untuk menggabungkan atau memindahkan meja
-app.post('/api/orders/merge', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'staff', 'KASIR']), async (req, res) => {
+app.post('/api/orders/merge', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'staff', 'KASIR', 'WAITER']), async (req, res) => {
   const { sourceOrderIds, targetOrderId } = req.body;
 
   if (!sourceOrderIds || !Array.isArray(sourceOrderIds) || !targetOrderId) {

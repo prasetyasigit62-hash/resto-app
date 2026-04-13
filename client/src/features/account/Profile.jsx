@@ -4,9 +4,9 @@ import { toast } from 'react-toastify';
 const Profile = ({ user, onUpdateUser }) => {
   const [formData, setFormData] = useState({
     username: user?.username || '',
-    email: user?.email || 'admin@superapp.com', // Mock email default
+    email: user?.email || 'user@resto.com', // Mock email default
     role: user?.role || 'Administrator',
-    bio: user?.bio || 'Superapp account.',
+    bio: user?.bio || 'Staff restoran.',
     image: user?.image || ''
   });
   const [imageFile, setImageFile] = useState(null);
@@ -77,56 +77,61 @@ const Profile = ({ user, onUpdateUser }) => {
   };
 
   return (
-    <div className="service-view">
-      <h2>Profil Pengguna</h2>
-      <p>Kelola informasi akun Anda.</p>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' }}>
+      <div style={{ marginBottom: '30px' }}>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-color)', marginBottom: '8px' }}>Profil Pengguna</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '1rem', margin: 0 }}>Kelola informasi identitas dan foto akun Anda.</p>
+      </div>
 
-      <div className="profile-page-container" style={{ marginTop: '30px' }}>
-        {/* Kartu Foto Profil */}
-        <div className="profile-sidebar-card">
-            <div className="profile-avatar-wrapper">
-              <div className="profile-avatar">
-                {formData.image ? (
-                  <img src={formData.image} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  formData.username.charAt(0).toUpperCase()
-                )}
+      <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {/* Kiri: Card Profile (Banner + Avatar) */}
+        <div style={{ flex: '1', minWidth: '300px', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-color)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+           {/* Banner Ala Restoran (Warm Gradient) */}
+           <div style={{ height: '120px', background: 'linear-gradient(135deg, #f59e0b, #ea580c)' }}></div>
+           
+           <div style={{ padding: '0 20px 30px', textAlign: 'center', marginTop: '-60px' }}>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                 <div style={{ width: '120px', height: '120px', borderRadius: '50%', border: '4px solid var(--card-bg)', background: 'var(--primary-color)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem', fontWeight: 'bold', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                    {formData.image ? <img src={formData.image} alt="Avatar" style={{width:'100%', height:'100%', objectFit:'cover'}} /> : formData.username.charAt(0).toUpperCase()}
+                 </div>
+                 <label style={{ position: 'absolute', bottom: '5px', right: '0', background: 'white', border: '1px solid #e2e8f0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'transform 0.2s' }} title="Ganti Foto" onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+                    📷
+                    <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+                 </label>
               </div>
-              <label className="profile-avatar-upload-btn" title="Ganti Foto Profil">
-                📷
-                <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
-              </label>
-            </div>
-            <h3 className="profile-name">{formData.username}</h3>
-            <span className="profile-role-badge">{formData.role}</span>
+              
+              <h3 style={{ margin: '15px 0 5px', fontSize: '1.5rem', color: 'var(--text-color)', fontWeight: '800' }}>{formData.username}</h3>
+              <div style={{ background: '#fef3c7', color: '#d97706', padding: '6px 16px', borderRadius: '20px', display: 'inline-block', fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{formData.role}</div>
+           </div>
         </div>
 
-        {/* Form Edit Profil */}
-        <div className="profile-main-content">
-            <div className="profile-form-header">
-              <h3>Informasi Akun</h3>
-            </div>
-            <form onSubmit={handleSubmit} style={{ margin: 0 }}>
-              <div className="profile-form">
-                <div className="profile-form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" value={formData.username} disabled className="profile-input" />
-                </div>
-                <div className="profile-form-group">
-                    <label>Email</label>
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} className="profile-input" />
-                </div>
-                <div className="profile-form-group">
-                    <label>Bio</label>
-                    <textarea name="bio" value={formData.bio} onChange={handleChange} className="profile-input" style={{ minHeight: '100px', fontFamily: 'inherit', resize: 'vertical' }} />
-                </div>
+        {/* Kanan: Form Details */}
+        <div style={{ flex: '2.5', minWidth: '300px', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '30px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+           <h3 style={{ margin: '0 0 20px 0', fontSize: '1.2rem', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>📝</span> Informasi Pribadi
+           </h3>
+           <form onSubmit={handleSubmit}>
+              <div style={{ display: 'grid', gap: '20px' }}>
+                 <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-color)' }}>Username (ID Sistem)</label>
+                    <input type="text" name="username" value={formData.username} disabled style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-muted)', fontSize: '0.95rem', cursor: 'not-allowed', boxSizing: 'border-box', opacity: 0.7 }} />
+                    <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Username bersifat unik dan tidak dapat diubah.</p>
+                 </div>
+                 <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-color)' }}>Alamat Email</label>
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="email@restoran.com" style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-color)', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }} />
+                 </div>
+                 <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-color)' }}>Biografi / Catatan Pegawai</label>
+                    <textarea name="bio" value={formData.bio} onChange={handleChange} placeholder="Ceritakan sedikit tentang tugas Anda di restoran ini..." style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-color)', fontSize: '0.95rem', outline: 'none', minHeight: '120px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}></textarea>
+                 </div>
               </div>
-              <div className="profile-form-actions">
-                    <button type="submit" className="profile-save-btn" disabled={loading}>
-                      {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
-                    </button>
-                </div>
-            </form>
+              <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'flex-end', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
+                 <button type="submit" disabled={loading} style={{ background: 'var(--primary-color)', color: 'white', border: 'none', padding: '14px 28px', borderRadius: '10px', fontWeight: 'bold', fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.2s', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 6px rgba(79, 70, 229, 0.2)' }}>
+                    {loading ? 'Menyimpan...' : '💾 Simpan Profil'}
+                 </button>
+              </div>
+           </form>
         </div>
       </div>
     </div>

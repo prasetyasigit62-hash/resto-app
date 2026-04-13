@@ -28,6 +28,15 @@ router.post('/login', async (req, res) => {
         const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
         user = result.rows[0];
         isOldUser = true;
+    } else if (user.password === 'migrated') {
+        // ✨ FIX: Ambil password asli dari DB V1 jika Prisma V2 menggunakan placeholder 'migrated'
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (result.rows.length > 0) {
+            user.password = result.rows[0].password;
+            isOldUser = true;
+            // Update sinkronisasi password sesungguhnya ke Prisma V2
+            try { await prisma.user.update({ where: { username }, data: { password: user.password } }); } catch(e) {}
+        }
     }
 
     if (!user || !bcrypt.compareSync(password, user.password)) {

@@ -98,6 +98,8 @@ function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('resto_theme') === 'dark';
   });
+  // ✨ STATE BARU: Menyimpan menu dinamis dari Database
+  const [dynamicMenus, setDynamicMenus] = useState({});
   const currentModule = 'Restoran'; // Hardcode khusus Resto App
 
   useEffect(() => { localStorage.setItem('resto_activeService', activeService); }, [activeService]);
@@ -116,6 +118,18 @@ function App() {
     localStorage.setItem('resto_theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
+  // ✨ FETCH WARNA TEMA PUBLIK (Berjalan walau belum login)
+  useEffect(() => {
+    fetch(`${getBackendUrl()}/api/public/settings`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.primaryColor) {
+          document.documentElement.style.setProperty('--primary-color', data.primaryColor);
+          document.documentElement.style.setProperty('--primary-hover', data.primaryColor + 'E6');
+        }
+      }).catch(() => {});
+  }, []);
+
   // ✨ FETCH DAFTAR OUTLET UNTUK DROPDOWN HEADER
   useEffect(() => {
     if (user && ['OWNER', 'ADMIN', 'SUPERADMIN'].includes(String(user.role).toUpperCase())) {
@@ -124,6 +138,21 @@ function App() {
             .then(res => res.json())
             .then(data => setOutlets(Array.isArray(data) ? data : []))
             .catch(err => console.error("Gagal load outlets untuk dropdown:", err));
+    }
+  }, [user]);
+
+  // ✨ FETCH MENU DINAMIS BERDASARKAN ROLE
+  useEffect(() => {
+    if (user) {
+        const token = localStorage.getItem('resto_token');
+        fetch(`${getBackendUrl()}/api/system/menus`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(data => {
+                if (data && !data.error) {
+                    setDynamicMenus(data);
+                }
+            })
+            .catch(err => console.error(err));
     }
   }, [user]);
 
@@ -953,53 +982,21 @@ function App() {
         </div>
 
         <nav className="sidebar-menu" onClick={(e) => { if (e.target.closest('.menu-item')) setIsMobileSidebarOpen(false); }}>
-              <div className="menu-label" style={{ marginTop: '10px' }}>ANALITIK & KEUANGAN</div>
-              
-              {isAdminOrOwner && (
-              <>
-                <button onClick={() => setActiveService('DashboardKPI')} className={`menu-item ${activeService === 'DashboardKPI' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>📊</span> Dashboard KPI</button>
-                <button onClick={() => setActiveService('SalesReport')} className={`menu-item ${activeService === 'SalesReport' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>📊</span> Laporan Penjualan</button>
-                <button onClick={() => setActiveService('Finance')} className={`menu-item ${activeService === 'Finance' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>💼</span> Keuangan (P&L)</button>
-                <button onClick={() => setActiveService('OutletComparisonV2')} className={`menu-item ${activeService === 'OutletComparisonV2' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🏢</span> Komparasi Outlet</button>
-                <button onClick={() => setActiveService('AiInsights')} className={`menu-item ${activeService === 'AiInsights' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🧠</span>Smart Operational Insight </button>
-              </>
+              {/* ✨ RENDER MENU DINAMIS DARI DATABASE */}
+              {Object.keys(dynamicMenus).length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Memuat Menu...</div>
+              ) : (
+                  Object.entries(dynamicMenus).map(([category, menus], idx) => (
+                      <React.Fragment key={category}>
+                          <div className="menu-label" style={{ marginTop: idx === 0 ? '10px' : '20px' }}>{category}</div>
+                          {Array.isArray(menus) && menus.map(menu => (
+                              <button key={menu.service_name} onClick={() => setActiveService(menu.service_name)} className={`menu-item ${activeService === menu.service_name ? 'active' : ''}`}>
+                                  <span style={{ marginRight: '10px' }}>{menu.icon}</span> {menu.title}
+                              </button>
+                          ))}
+                      </React.Fragment>
+                  ))
               )}
-              {(isAdminOrOwner || isKasir) && (
-                  <button onClick={() => setActiveService('ShiftReport')} className={`menu-item ${activeService === 'ShiftReport' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🔐</span> Laporan Shift Kasir</button>
-              )}
-
-              <div className="menu-label" style={{ marginTop: '20px' }}>OPERASIONAL RESTORAN</div>
-              {(isAdminOrOwner || isKasir) && (
-                <>
-                  <button onClick={() => setActiveService('POS')} className={`menu-item ${activeService === 'POS' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>📠</span> Kasir & POS</button>
-                  <button onClick={() => setActiveService('Reservations')} className={`menu-item ${activeService === 'Reservations' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>📅</span> Reservasi Meja</button>
-                </>
-              )}
-              {(isAdminOrOwner || isChef) && (
-                  <button onClick={() => setActiveService('KitchenView')} className={`menu-item ${activeService === 'KitchenView' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>👨‍🍳</span> Kitchen Display (KDS)</button>
-              )}
-              {isAdminOrOwner && (
-                  <button onClick={() => setActiveService('Tables')} className={`menu-item ${activeService === 'Tables' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🪑</span> Manajemen Meja & QR</button>
-              )}
-
-              {isAdminOrOwner && (
-              <>
-                <div className="menu-label" style={{ marginTop: '20px' }}>INVENTORI & PRODUK</div>
-                <button onClick={() => setActiveService('MenuBOM')} className={`menu-item ${activeService === 'MenuBOM' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🍲</span> Resep, BOM & Margin</button>
-                <button onClick={() => setActiveService('InventoryV2')} className={`menu-item ${activeService === 'InventoryV2' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🌾</span> Master Bahan Baku</button>
-                <button onClick={() => setActiveService('StockOpname')} className={`menu-item ${activeService === 'StockOpname' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>📦</span> Stok & Opname</button>
-                <button onClick={() => setActiveService('PurchaseOrder')} className={`menu-item ${activeService === 'PurchaseOrder' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🛒</span> Pembelian (PO)</button>
-                <button onClick={() => setActiveService('Suppliers')} className={`menu-item ${activeService === 'Suppliers' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🚚</span> Data Supplier</button>
-
-                <div className="menu-label" style={{ marginTop: '20px' }}>SDM & PELANGGAN</div>
-                <button onClick={() => setActiveService('CRM')} className={`menu-item ${activeService === 'CRM' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>👑</span> CRM & Pelanggan</button>
-                <button onClick={() => setActiveService('Vouchers')} className={`menu-item ${activeService === 'Vouchers' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🎟️</span> Voucher & Promo</button>
-                <button onClick={() => setActiveService('UserManagementV2')} className={`menu-item ${activeService === 'UserManagementV2' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>👥</span> Manajemen Pegawai</button>
-                <button onClick={() => setActiveService('OutletManagement')} className={`menu-item ${activeService === 'OutletManagement' ? 'active' : ''}`}><span style={{ marginRight: '10px' }}>🏪</span> Manajemen Cabang</button>
-              </>
-              )}
-
-              <button onClick={() => setActiveService('Attendance')} className={`menu-item ${activeService === 'Attendance' ? 'active' : ''}`} style={{ marginTop: isAdminOrOwner ? '0' : '20px' }}><span style={{ marginRight: '10px' }}>⏱️</span> Absensi Kehadiran</button>
 
               {isAdminOrOwner && (
                  <button onClick={() => window.open('/order/preview', '_blank')} className="menu-item" style={{ marginTop: '15px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>

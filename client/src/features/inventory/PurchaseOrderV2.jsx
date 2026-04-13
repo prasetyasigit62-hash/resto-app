@@ -9,6 +9,13 @@ const PurchaseOrderV2 = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ outletId: '', supplierId: '', items: [] });
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', action: null, type: 'primary' });
+
+  // ✨ Helper Format Rupiah Otomatis
+  const formatRupiah = (value) => {
+    if (!value) return '';
+    return String(value).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -35,18 +42,27 @@ const PurchaseOrderV2 = ({ user }) => {
   const removeItemRow = (index) => setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) });
   const updateItemRow = (index, field, value) => {
     const newItems = [...formData.items];
-    newItems[index][field] = value;
+    if (field === 'price') {
+        newItems[index][field] = formatRupiah(value);
+    } else {
+        newItems[index][field] = value;
+    }
     // Auto-fill harga jika bahan dipilih
     if (field === 'materialId') {
         const mat = materials.find(m => m.id === value);
-        if (mat) newItems[index].price = mat.lastPrice || 0;
+        if (mat) newItems[index].price = formatRupiah(mat.lastPrice || 0);
     }
     setFormData({ ...formData, items: newItems });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const validItems = formData.items.filter(i => i.materialId && Number(i.qty) > 0);
+    const validItems = formData.items
+      .filter(i => i.materialId && Number(i.qty) > 0)
+      .map(i => ({
+        ...i,
+        price: Number(String(i.price).replace(/\./g, '')) // ✨ Hilangkan titik sebelum kirim ke backend
+      }));
     if (validItems.length === 0) return toast.warn("Masukkan minimal 1 bahan baku yang valid!");
 
     const token = localStorage.getItem('resto_token');
@@ -65,19 +81,42 @@ const PurchaseOrderV2 = ({ user }) => {
   };
 
   const updateStatus = async (id, status) => {
-    if (!window.confirm(`Yakin mengubah status PO menjadi ${status}? ${status === 'RECEIVED' ? 'Stok akan otomatis ditambahkan ke outlet.' : ''}`)) return;
-    const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
-    try {
-      const res = await fetch(`${backendUrl}/api/v2/purchase-orders/${id}/status`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        toast.success(`Status PO menjadi ${status}`);
-        fetchData();
-      } else toast.error("Gagal update status PO.");
-    } catch (err) { toast.error("Error koneksi."); }
+    let title = '';
+    let message = '';
+    let type = 'primary';
+
+    if (status === 'APPROVED') {
+        title = 'Setujui Dokumen PO?';
+        message = 'Apakah Anda yakin ingin menyetujui Purchase Order ini?';
+        type = 'primary';
+    } else if (status === 'RECEIVED') {
+        title = 'Terima Barang & Restock?';
+        message = 'Sistem akan otomatis menambahkan jumlah barang pesanan ini ke gudang. Lanjutkan?';
+        type = 'success';
+    } else if (status === 'REJECTED') {
+        title = 'Tolak PO?';
+        message = 'PO yang ditolak tidak bisa diproses kembali. Yakin ingin menolak?';
+        type = 'danger';
+    }
+
+    setConfirmModal({
+        show: true,
+        title,
+        message,
+        type,
+        action: async () => {
+            const token = localStorage.getItem('resto_token');
+            const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+            try {
+              const res = await fetch(`${backendUrl}/api/v2/purchase-orders/${id}/status`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ status })
+              });
+              if (res.ok) { toast.success(`Status PO berhasil menjadi ${status}`); fetchData(); } 
+              else toast.error("Gagal update status PO.");
+            } catch (err) { toast.error("Error koneksi."); }
+        }
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -171,7 +210,7 @@ const PurchaseOrderV2 = ({ user }) => {
                       <div key={idx} style={{ display: 'flex', gap: '15px', alignItems: 'center', background: '#ffffff', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                         <div style={{ flex: 2 }}><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Bahan Baku</label><select required value={item.materialId} onChange={e => updateItemRow(idx, 'materialId', e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', background: 'white' }}><option value="">-- Pilih --</option>{materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}</select></div>
                         <div style={{ flex: 1 }}><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Jumlah</label><input required type="number" step="0.01" value={item.qty} onChange={e => updateItemRow(idx, 'qty', e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} /></div>
-                        <div style={{ flex: 1.5 }}><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Harga Satuan (Rp)</label><input required type="number" value={item.price} onChange={e => updateItemRow(idx, 'price', e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} /></div>
+                        <div style={{ flex: 1.5 }}><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Harga Satuan (Rp)</label><input required type="text" value={item.price} onChange={e => updateItemRow(idx, 'price', e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} /></div>
                         <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}><button type="button" onClick={() => removeItemRow(idx)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.2rem', cursor: 'pointer', marginTop: '22px' }}>&times;</button></div>
                       </div>
                     ))}
@@ -180,6 +219,38 @@ const PurchaseOrderV2 = ({ user }) => {
               </div>
               <button type="submit" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', fontWeight: '800', borderRadius: '14px', display: 'flex', justifyContent: 'center', gap: '10px', alignItems: 'center', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)', color: 'white', border: 'none', cursor: 'pointer' }}><span>📤</span> Buat Draft PO</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✨ MODAL KONFIRMASI KUSTOM RESPONSIVE */}
+      {confirmModal.show && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000, animation: 'fadeIn 0.2s ease-out' }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            
+            <div style={{ fontSize: '3.5rem', marginBottom: '15px', lineHeight: 1 }}>
+              {confirmModal.type === 'danger' ? '⚠️' : confirmModal.type === 'success' ? '📦' : '❓'}
+            </div>
+            
+            <h3 style={{ margin: '0 0 10px 0', color: '#1e293b', fontSize: '1.4rem', fontWeight: '800' }}>
+              {confirmModal.title}
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '25px', lineHeight: '1.6' }}>
+              {confirmModal.message}
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button 
+                onClick={() => setConfirmModal({ ...confirmModal, show: false })} 
+                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
+                Batal
+              </button>
+              <button 
+                onClick={() => { confirmModal.action(); setConfirmModal({ ...confirmModal, show: false }); }} 
+                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: confirmModal.type === 'danger' ? '#ef4444' : confirmModal.type === 'success' ? '#10b981' : '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                Ya, Lanjutkan
+              </button>
+            </div>
           </div>
         </div>
       )}

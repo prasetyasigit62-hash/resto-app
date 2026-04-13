@@ -8,6 +8,13 @@ const MenuBomV2 = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', price: '', image: '', categoryId: '', recipes: [] });
+  const [zoomedImage, setZoomedImage] = useState(null); // ✨ State untuk Modal Zoom Gambar
+
+  // ✨ Helper Format Rupiah Otomatis
+  const formatRupiah = (value) => {
+    if (!value) return '';
+    return String(value).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -93,7 +100,7 @@ const MenuBomV2 = () => {
       const res = await fetch(`${backendUrl}/api/v2/menus`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ ...formData, price: Number(formData.price), categoryId: formData.categoryId || null, recipes: validRecipes })
+        body: JSON.stringify({ ...formData, price: Number(String(formData.price).replace(/\./g, '')), categoryId: formData.categoryId || null, recipes: validRecipes })
       });
       if (res.ok) {
         toast.success("Menu dan Resep berhasil ditambahkan!");
@@ -178,7 +185,7 @@ const MenuBomV2 = () => {
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Harga Jual (Rp) <span style={{color:'#ef4444'}}>*</span></label>
-                    <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="Cth: 35000" style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }} />
+                    <input required type="text" value={formData.price} onChange={e => setFormData({...formData, price: formatRupiah(e.target.value)})} placeholder="Cth: 35.000" style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 </div>
 
@@ -202,7 +209,7 @@ const MenuBomV2 = () => {
                         <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
                         {formData.image ? '🔄 Ganti Gambar' : '📁 Pilih File Gambar'}
                       </label>
-                      {formData.image && <img src={formData.image} alt="Preview" style={{ width: '46px', height: '46px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #e2e8f0' }} />}
+                      {formData.image && <img src={formData.image} alt="Preview" style={{ width: '46px', height: '46px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #e2e8f0', cursor: 'zoom-in' }} onClick={(e) => { e.stopPropagation(); setZoomedImage(formData.image); }} title="Klik untuk memperbesar" />}
                     </div>
                   </div>
                 </div>
@@ -256,6 +263,17 @@ const MenuBomV2 = () => {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✨ MODAL ZOOM GAMBAR */}
+      {zoomedImage && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.9)', zIndex: 100000, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out' }} onClick={() => setZoomedImage(null)}>
+          <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%', padding: '20px' }}>
+            <button onClick={() => setZoomedImage(null)} style={{ position: 'absolute', top: '-10px', right: '-10px', background: '#ef4444', border: 'none', color: 'white', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>&times;</button>
+            <img src={zoomedImage} alt="Zoomed Preview" style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', objectFit: 'contain', border: '4px solid white' }} onClick={(e) => e.stopPropagation()} />
+            <p style={{ color: 'white', textAlign: 'center', marginTop: '15px', fontWeight: 'bold', fontSize: '1.1rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Mode Pratinjau Gambar</p>
           </div>
         </div>
       )}

@@ -8,11 +8,13 @@ const StockMutationV2 = ({ user }) => {
   const [materials, setMaterials] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('stok'); // 'stok' | 'mutasi'
+  const [activeTab, setActiveTab] = useState('stok'); // 'stok' | 'mutasi' | 'fraud'
+  
+  const [fraudData, setFraudData] = useState({ report: [], tolerancePercent: 5 });
   
   // Modal Opname
   const [showOpnameModal, setShowOpnameModal] = useState(false);
-  const [opnameForm, setOpnameForm] = useState({ outletId: '', materialId: '', realQty: '', note: '' });
+  const [opnameForm, setOpnameForm] = useState({ outletId: '', materialId: '', realQty: '', note: '', mode: 'set' });
   
   // ✨ Modal Waste (Barang Rusak)
   const [showWasteModal, setShowWasteModal] = useState(false);
@@ -21,6 +23,12 @@ const StockMutationV2 = ({ user }) => {
   // ✨ Modal Quick Restock (Pembelian Manual Tanpa PO)
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [restockForm, setRestockForm] = useState({ outletId: '', materialId: '', qty: '', cost: '', supplierId: '', note: '' });
+
+  // ✨ Helper Format Rupiah Otomatis
+  const formatRupiah = (value) => {
+    if (!value) return '';
+    return String(value).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -39,6 +47,13 @@ const StockMutationV2 = ({ user }) => {
       if (resOut.ok) setOutlets(await resOut.json());
       if (resMat.ok) setMaterials(await resMat.json());
       if (resSup.ok) setSuppliers(await resSup.json());
+      
+      // Fetch Fraud Data jika user adalah admin/owner
+      if (['OWNER', 'ADMIN', 'SUPERADMIN'].includes(String(user.role).toUpperCase())) {
+         const resFraud = await fetch(`${backendUrl}/api/v2/reports/fraud?outletId=${user.outletId || 'ALL'}`, { headers: { 'Authorization': `Bearer ${token}` } });
+         if (resFraud.ok) setFraudData(await resFraud.json());
+      }
+      
     } catch (err) { toast.error("Gagal memuat data stok."); }
     finally { setLoading(false); }
   };
@@ -49,11 +64,26 @@ const StockMutationV2 = ({ user }) => {
     e.preventDefault();
     const token = localStorage.getItem('resto_token');
     const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+
+    // ✨ Hitung realQty berdasarkan mode yang dipilih (Set / Add / Subtract)
+    const s = stocks.find(st => st.materialId === opnameForm.materialId && (!opnameForm.outletId || st.outletId === opnameForm.outletId));
+    const curr = s ? s.qty : 0;
+    const inputVal = Number(opnameForm.realQty);
+    let finalQty = inputVal;
+    
+    if (opnameForm.mode === 'subtract') finalQty = curr - inputVal;
+    else if (opnameForm.mode === 'add') finalQty = curr + inputVal;
+
+    const payload = {
+        ...opnameForm,
+        realQty: finalQty
+    };
+
     try {
       const res = await fetch(`${backendUrl}/api/v2/mutations/adjust`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(opnameForm)
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
       if (res.ok) {
@@ -83,8 +113,12 @@ const StockMutationV2 = ({ user }) => {
     const token = localStorage.getItem('resto_token');
     const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
+      const payload = {
+        ...restockForm,
+        cost: restockForm.cost ? Number(String(restockForm.cost).replace(/\./g, '')) : ''
+      };
       const res = await fetch(`${backendUrl}/api/v2/mutations/restock`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(restockForm)
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload)
       });
       const result = await res.json();
       if (res.ok) { toast.success(result.message); setShowRestockModal(false); fetchData(); } 
@@ -117,7 +151,7 @@ const StockMutationV2 = ({ user }) => {
             <button onClick={() => { setWasteForm({ outletId: user.outletId || '', materialId: '', wasteQty: '', note: 'Barang Rusak / Kadaluarsa' }); setShowWasteModal(true); }} className="profile-save-btn" style={{ width: 'auto', background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 4px 6px rgba(239,68,68,0.3)' }}>
                 🗑️ Catat Waste
             </button>
-            <button onClick={() => { setOpnameForm({ outletId: user.outletId || '', materialId: '', realQty: '', note: 'Stock Opname Harian' }); setShowOpnameModal(true); }} className="profile-save-btn" style={{ width: 'auto', background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 6px rgba(245,158,11,0.3)' }}>
+            <button onClick={() => { setOpnameForm({ outletId: user.outletId || '', materialId: '', realQty: '', note: 'Stock Opname Harian', mode: 'set' }); setShowOpnameModal(true); }} className="profile-save-btn" style={{ width: 'auto', background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 6px rgba(245,158,11,0.3)' }}>
                 ⚖️ Lakukan Opname
             </button>
         </div>
@@ -126,6 +160,9 @@ const StockMutationV2 = ({ user }) => {
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)' }}>
         <button onClick={() => setActiveTab('stok')} style={{ padding: '10px 20px', border: 'none', background: 'transparent', fontWeight: 'bold', fontSize: '1rem', color: activeTab === 'stok' ? 'var(--primary-color)' : 'var(--text-muted)', borderBottom: activeTab === 'stok' ? '3px solid var(--primary-color)' : 'none', cursor: 'pointer' }}>Stok Real-time Cabang</button>
         <button onClick={() => setActiveTab('mutasi')} style={{ padding: '10px 20px', border: 'none', background: 'transparent', fontWeight: 'bold', fontSize: '1rem', color: activeTab === 'mutasi' ? 'var(--primary-color)' : 'var(--text-muted)', borderBottom: activeTab === 'mutasi' ? '3px solid var(--primary-color)' : 'none', cursor: 'pointer' }}>Riwayat Mutasi (Ledger)</button>
+        {['OWNER', 'ADMIN', 'SUPERADMIN'].includes(String(user.role).toUpperCase()) && (
+          <button onClick={() => setActiveTab('fraud')} style={{ padding: '10px 20px', border: 'none', background: 'transparent', fontWeight: 'bold', fontSize: '1rem', color: activeTab === 'fraud' ? '#ef4444' : 'var(--text-muted)', borderBottom: activeTab === 'fraud' ? '3px solid #ef4444' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>🚨 Analitik Fraud & Susut</button>
+        )}
       </div>
 
       {loading ? <p>Memuat data...</p> : activeTab === 'stok' ? (
@@ -148,7 +185,7 @@ const StockMutationV2 = ({ user }) => {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : activeTab === 'mutasi' ? (
         <div className="table-responsive" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
           <table className="data-table">
             <thead><tr><th>Waktu</th><th>Cabang</th><th>Bahan Baku</th><th>Jenis Mutasi</th><th>Jml Masuk/Keluar</th><th>Oleh</th><th>Keterangan</th></tr></thead>
@@ -167,7 +204,44 @@ const StockMutationV2 = ({ user }) => {
             </tbody>
           </table>
         </div>
-      )}
+      ) : activeTab === 'fraud' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h3 style={{ margin: '0 0 5px 0', color: '#991b1b' }}>Investigasi Kecolongan & Selisih Stok</h3>
+                    <p style={{ margin: 0, color: '#b91c1c', fontSize: '0.9rem' }}>Batas Pemakluman / Toleransi Sistem: <strong>{fraudData.tolerancePercent}%</strong></p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 'bold' }}>Total Potensi Kerugian (Rp)</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: '900', color: '#dc2626' }}>
+                        Rp {fraudData.report.reduce((acc, curr) => acc + curr.financialLoss, 0).toLocaleString('id-ID')}
+                    </div>
+                </div>
+            </div>
+            <div className="table-responsive" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <table className="data-table">
+                <thead><tr><th>Cabang</th><th>Bahan Baku</th><th>Terjual POS</th><th>Dilaporkan Rusak</th><th>Hilang Tanpa Jejak</th><th>Tingkat Susut</th><th>Nilai Kerugian</th><th>PIC Opname Terakhir</th><th>Status</th></tr></thead>
+                <tbody>
+                  {fraudData.report.length === 0 ? <tr><td colSpan="9" style={{textAlign:'center', padding:'30px', color:'#10b981', fontWeight:'bold'}}>🎉 Hebat! Tidak ada barang hilang atau selisih stok (Aman dari Fraud).</td></tr> : fraudData.report.map((r, i) => (
+                      <tr key={i} style={{ background: r.isFraud ? '#fff1f2' : 'transparent' }}>
+                        <td style={{ fontWeight: 'bold' }}>{r.outletName}</td>
+                        <td style={{ fontWeight: 'bold' }}>{r.materialName}</td>
+                        <td style={{ color: '#3b82f6', fontWeight: 'bold' }}>{r.totalSalesUsage} {r.unit}</td>
+                        <td style={{ color: '#f59e0b', fontWeight: 'bold' }}>{r.totalWaste} {r.unit}</td>
+                        <td style={{ color: '#ef4444', fontWeight: '900', fontSize: '1.1rem' }}>{r.totalMissing} {r.unit}</td>
+                        <td><span style={{ fontWeight: 'bold', color: r.isFraud ? '#ef4444' : '#64748b' }}>{r.lossRate}%</span></td>
+                        <td style={{ fontWeight: 'bold', color: '#dc2626' }}>Rp {r.financialLoss.toLocaleString('id-ID')}</td>
+                        <td><span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem' }}>👤 {r.suspectUsers}</span></td>
+                        <td>
+                            {r.isFraud ? <span style={{ background: '#ef4444', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold' }}>🚨 INDIKASI FRAUD</span> : <span style={{ background: '#f1f5f9', color: '#64748b', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold' }}>Wajar / Dimaklumi</span>}
+                        </td>
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+        </div>
+      ) : null}
 
       {showOpnameModal && (
         <div className="modal-overlay" style={{ backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backgroundColor: 'rgba(15, 23, 42, 0.6)', zIndex: 1000, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -201,16 +275,67 @@ const StockMutationV2 = ({ user }) => {
                   </select>
                 </div>
               </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Mode Penyesuaian <span style={{color:'#ef4444'}}>*</span></label>
+              <select required value={opnameForm.mode || 'set'} onChange={e => setOpnameForm({...opnameForm, mode: e.target.value})} style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: 'white', cursor: 'pointer' }}>
+                <option value="set">Set Total Sisa Fisik (Stock Opname Normal)</option>
+                <option value="subtract">Kurangi Stok (Selisih Minus)</option>
+                <option value="add">Tambah Stok (Selisih Plus)</option>
+              </select>
+            </div>
+          </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Jumlah Fisik Sebenarnya <span style={{color:'#ef4444'}}>*</span></label>
-                  <input required type="number" step="0.01" value={opnameForm.realQty} onChange={e => setOpnameForm({...opnameForm, realQty: e.target.value})} placeholder="Cth: 15.5" style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: '#f8fafc' }} />
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Input Angka <span style={{color:'#ef4444'}}>*</span></label>
+              <input required type="number" step="0.01" min="0" value={opnameForm.realQty} onChange={e => setOpnameForm({...opnameForm, realQty: e.target.value})} placeholder={opnameForm.mode === 'set' ? "Cth: Sisa fisik di gudang" : "Cth: 5"} style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: '#f8fafc' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Keterangan / Catatan <span style={{color:'#ef4444'}}>*</span></label>
                   <input required value={opnameForm.note} onChange={e => setOpnameForm({...opnameForm, note: e.target.value})} placeholder="Cth: Penyesuaian akhir bulan" style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: '#f8fafc' }} />
                 </div>
               </div>
+
+              {/* ✨ NEW: Info Kalkulasi Opname Real-time */}
+              {opnameForm.materialId && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', background: '#eff6ff', padding: '15px 20px', borderRadius: '12px', border: '1px dashed #93c5fd' }}>
+                   <div>
+                      <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 'bold' }}>Stok Sistem Saat Ini</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#1e3a8a' }}>
+                          {(() => {
+                              const s = stocks.find(st => st.materialId === opnameForm.materialId && (!opnameForm.outletId || st.outletId === opnameForm.outletId));
+                              return s ? s.qty : 0;
+                          })()}
+                      </div>
+                   </div>
+                   <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 'bold' }}>Hasil Akhir (Estimasi)</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: '900', color: (() => {
+                          const s = stocks.find(st => st.materialId === opnameForm.materialId && (!opnameForm.outletId || st.outletId === opnameForm.outletId));
+                          const curr = s ? s.qty : 0;
+                      const inputVal = opnameForm.realQty !== '' ? Number(opnameForm.realQty) : 0;
+                      let diff = 0;
+                      if (opnameForm.mode === 'subtract') diff = -inputVal;
+                      else if (opnameForm.mode === 'add') diff = inputVal;
+                      else diff = inputVal - curr;
+                          return diff > 0 ? '#16a34a' : (diff < 0 ? '#ef4444' : '#64748b');
+                      })() }}>
+                          {(() => {
+                              const s = stocks.find(st => st.materialId === opnameForm.materialId && (!opnameForm.outletId || st.outletId === opnameForm.outletId));
+                              const curr = s ? s.qty : 0;
+                          const inputVal = opnameForm.realQty !== '' ? Number(opnameForm.realQty) : 0;
+                          let finalQty = curr;
+                          let diff = 0;
+                          if (opnameForm.mode === 'subtract') { diff = -inputVal; finalQty = curr - inputVal; }
+                          else if (opnameForm.mode === 'add') { diff = inputVal; finalQty = curr + inputVal; }
+                          else { finalQty = inputVal; diff = inputVal - curr; }
+                          return `${finalQty} (${diff > 0 ? '+' : ''}${diff})`;
+                          })()}
+                      </div>
+                   </div>
+                </div>
+              )}
+
               <button type="submit" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', fontWeight: '800', borderRadius: '14px', display: 'flex', justifyContent: 'center', gap: '10px', alignItems: 'center', background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 10px 15px -3px rgba(245, 158, 11, 0.3)', color: 'white', border: 'none', cursor: 'pointer', marginTop: '10px' }}><span>⚖️</span> Update Stok Sistem</button>
             </form>
           </div>
@@ -306,7 +431,7 @@ const StockMutationV2 = ({ user }) => {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Harga Beli Baru (Rp)</label>
-                  <input type="number" value={restockForm.cost} onChange={e => setRestockForm({...restockForm, cost: e.target.value})} placeholder="Opsional (Update harga)" style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: '#f8fafc' }} />
+                  <input type="text" value={restockForm.cost} onChange={e => setRestockForm({...restockForm, cost: formatRupiah(e.target.value)})} placeholder="Opsional (Update harga)" style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: '#f8fafc' }} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>

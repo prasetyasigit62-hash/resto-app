@@ -852,6 +852,53 @@
   cursor: not-allowed;
 }
 
+/* --- MODERN NATIVE DROPDOWN (SELECT) GLOBAL STYLES --- */
+select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 16px center !important;
+  background-size: 18px !important;
+  padding-right: 45px !important;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+}
+
+select:hover:not(:disabled) {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.08) !important;
+  transform: translateY(-1px);
+}
+
+select:focus {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15) !important;
+  outline: none !important;
+  transform: translateY(0);
+}
+
+[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23818cf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+  color: #e2e8f0 !important;
+}
+
+select option {
+  font-weight: 600;
+  color: #1e293b;
+  padding: 12px;
+  background-color: white;
+}
+
+[data-theme="dark"] select option {
+  color: #e2e8f0;
+  background-color: #1e293b;
+}
+
 .profile-save-btn {
   background-color: var(--primary-color);
   color: white;
@@ -999,12 +1046,12 @@
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 1.5rem; cursor: pointer; color: var(--text-muted);
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .modal-close:hover {
-  background: var(--danger-color);
-  color: white;
-  transform: rotate(90deg);
+  background: transparent;
+  color: var(--danger-color);
+  transform: rotate(90deg) scale(1.15);
 }
 
 .modal-image {

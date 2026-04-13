@@ -7,8 +7,81 @@ import { usePos } from './usePos';
 const PosMain = (props) => {
   const pos = usePos(props);
   const {
-    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
+    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, showNoteModal, setShowNoteModal, noteItem, setNoteItem, noteInput, setNoteInput, saveNote, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
   } = pos;
+
+  // ✨ Local State untuk Input Manual Tag Varian
+  const [manualTag, setManualTag] = React.useState('');
+  const currentTags = noteInput ? noteInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  // ✨ MODAL ADD TO CART (POPUP PEMILIHAN & REVIEW MENU)
+  const [showAddToCartModal, setShowAddToCartModal] = React.useState(false);
+  const [cartModalItem, setCartModalItem] = React.useState(null);
+  const [cartModalQty, setCartModalQty] = React.useState(1);
+  const [cartModalNote, setCartModalNote] = React.useState('');
+  const [cartModalManualTag, setCartModalManualTag] = React.useState('');
+  const cartModalCurrentTags = cartModalNote ? cartModalNote.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  const openAddToCartModal = (item) => {
+      if (item.stock !== null && item.stock === 0) {
+        toast.warn(`Stok untuk ${item.name} habis!`);
+        return;
+      }
+      setCartModalItem(item);
+      setCartModalQty(1);
+      setCartModalNote('');
+      setCartModalManualTag('');
+      setShowAddToCartModal(true);
+  };
+
+  const confirmAddToCart = () => {
+      let finalNote = cartModalNote;
+      if (cartModalManualTag.trim()) {
+          finalNote = cartModalNote ? `${cartModalNote}, ${cartModalManualTag.trim()}` : cartModalManualTag.trim();
+      }
+
+      const existingIndex = activeCart.findIndex(c => c.id === cartModalItem.id && c.note === finalNote);
+      if (existingIndex >= 0) {
+          const updatedCart = [...activeCart];
+          updatedCart[existingIndex].qty += cartModalQty;
+          setActiveCart(updatedCart);
+      } else {
+          setActiveCart([...activeCart, { ...cartModalItem, qty: cartModalQty, service: 'Restoran', note: finalNote }]);
+      }
+
+      setShowAddToCartModal(false);
+      setCartModalItem(null);
+      toast.success(`${cartModalQty}x ${cartModalItem.name} ditambahkan!`);
+  };
+
+  // ✨ SMART DYNAMIC VARIANTS: Otomatis mendeteksi varian yang cocok dengan jenis makanan/minuman
+  const getDynamicVariantGroups = (item) => {
+    if (!item) return [];
+    const name = (item.name || '').toLowerCase();
+    const category = (item.cuisine || '').toLowerCase();
+
+    const isDrink = category.includes('minum') || name.includes('es ') || name.includes('kopi') || name.includes('teh') || name.includes('jus') || name.includes('ice') || name.includes('drink');
+    const isSteakOrMeat = category.includes('steak') || category.includes('daging') || name.includes('steak') || name.includes('sirloin') || name.includes('tenderloin') || name.includes('ribeye') || name.includes('beef') || name.includes('wagyu');
+    const isFood = !isDrink; // Anggap selain minuman adalah makanan
+
+    const groups = [];
+
+    if (isSteakOrMeat) {
+      groups.push({ title: '🥩 Kematangan Daging', tags: ['Rare', 'Medium Rare', 'Medium', 'Medium Well', 'Well Done'] });
+      groups.push({ title: '🥣 Pilihan Saus', tags: ['Saus BBQ', 'Blackpepper', 'Mushroom', 'Saus Keju', 'Saus Teriyaki'] });
+    } else if (isDrink) {
+      groups.push({ title: '🥤 Kustom Minuman', tags: ['Less Ice', 'No Ice', 'Less Sugar', 'No Sugar'] });
+    } 
+    
+    if (isFood && !isSteakOrMeat) {
+      groups.push({ title: '🌶️ Tingkat Kepedasan', tags: ['Tidak Pedas', 'Pedas Sedang', 'Sangat Pedas'] });
+    }
+
+    // Selalu tampilkan opsi umum di akhir
+    groups.push({ title: '📝 Kustom Lainnya', tags: ['Tanpa Bawang', 'Karet Pisah', 'Dibungkus', 'Pisah Kuah'] });
+
+    return groups;
+  };
 
   return (
     <>
@@ -30,8 +103,8 @@ const PosMain = (props) => {
       </div>
     )}
 
-      {/* ✨ MODAL PEMILIHAN MEJA */}
-      {showTableModal && (
+      {/* ✨ MODAL PEMILIHAN MEJA (Ditahan sampai Shift Kasir aktif) */}
+      {(showTableModal && activeShift) && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
@@ -130,7 +203,7 @@ const PosMain = (props) => {
             {filteredMenu.map((item, index) => (
               <div
                 key={item.id}
-                onClick={() => addToCart(item)}
+                onClick={() => openAddToCartModal(item)}
                 className="pos-item-anim"
                 style={{
                   '--target-opacity': item.stock === 0 ? 0.5 : 1,
@@ -214,19 +287,21 @@ const PosMain = (props) => {
               <div style={styles.posCartEmpty}>Keranjang kosong</div>
             ) : (
             <>
-            {/* ✨ NEW: Pilih Koki / Chef */}
-            <div style={{ marginBottom: '15px', background: 'var(--bg-color)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>👨‍🍳 Chef Bertugas:</label>
-                <select value={selectedChef} onChange={e => setSelectedChef(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}>
-                    <option value="">-- Pilih Chef (Opsional) --</option>
-                    {chefs.map(chef => (
-                        <option key={chef.id} value={chef.id}>{chef.username}</option>
-                    ))}
-                </select>
-            </div>
+            {/* ✨ NEW: Pilih Koki / Chef (Disembunyikan saat Split Mode agar hemat ruang layar) */}
+            {!isSplitMode && (
+              <div style={{ marginBottom: '15px', background: 'var(--bg-color)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>👨‍🍳 Chef Bertugas:</label>
+                  <select value={selectedChef} onChange={e => setSelectedChef(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}>
+                      <option value="">-- Pilih Chef (Opsional) --</option>
+                      {chefs.map(chef => (
+                          <option key={chef.id} value={chef.id}>{chef.username}</option>
+                      ))}
+                  </select>
+              </div>
+            )}
 
               {activeCart.map(item => (
-                <div key={item.id} style={styles.posCartItem}>
+                <div key={item.id} style={{ ...styles.posCartItem, marginBottom: isSplitMode ? '8px' : '15px', padding: isSplitMode ? '8px' : '12px' }}>
                   <div style={styles.posCartItemDetails}>
                     <p style={styles.posCartItemName}>{item.name}</p>
                     {item.note && (
@@ -234,14 +309,25 @@ const PosMain = (props) => {
                         📝 {item.note}
                       </p>
                     )}
-                    <p style={styles.posCartItemPrice}>{item.price}</p>
+                    <p style={styles.posCartItemPrice}>{item.price} {isSplitMode ? <span style={{color: '#b45309'}}>(Total Porsi: {item.qty})</span> : ''}</p>
                   </div>
-                  <div style={styles.posCartItemActions}>
-                    <button onClick={() => handleEditNote(item)} style={styles.posEditNoteBtn} title="Tambah/Edit Catatan">🗒️</button>
-                    <button onClick={() => updateQuantity(item.id, -1)} style={styles.posQtyBtn}>-</button>
-                    <span style={styles.posQtyValue}>{item.qty}</span>
-                    <button onClick={() => updateQuantity(item.id, 1)} style={styles.posQtyBtn}>+</button>
-                  </div>
+                  {isSplitMode ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fef9c3', padding: '4px 6px', borderRadius: '10px', border: '1px solid #fde047' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#b45309', marginLeft: '4px' }}>Bayar:</span>
+                          <button onClick={() => setSplitSelection(prev => ({...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1)}))} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: 'white', color: '#b45309', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', padding: 0, lineHeight: 1 }}>−</button>
+                          <span style={{ fontWeight: 'bold', color: '#b45309', minWidth: '20px', textAlign: 'center', fontSize: '0.95rem' }}>{splitSelection[item.id] || 0}</span>
+                          <button onClick={() => setSplitSelection(prev => ({...prev, [item.id]: Math.min(item.qty, (prev[item.id] || 0) + 1)}))} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: '#eab308', color: 'white', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(234, 179, 8, 0.2)', padding: 0, lineHeight: 1 }}>+</button>
+                      </div>
+                  ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button onClick={() => handleEditNote(item)} style={styles.posEditNoteBtn} title="Tambah/Edit Catatan">🗒️</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f1f5f9', padding: '4px 6px', borderRadius: '10px' }}>
+                          <button onClick={() => updateQuantity(item.id, -1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: 'white', color: '#64748b', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', padding: 0, lineHeight: 1 }}>−</button>
+                          <span style={{ fontWeight: 'bold', color: '#0f172a', minWidth: '20px', textAlign: 'center', fontSize: '0.95rem' }}>{item.qty}</span>
+                          <button onClick={() => updateQuantity(item.id, 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: 'white', color: 'var(--primary-color)', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', padding: 0, lineHeight: 1 }}>+</button>
+                        </div>
+                      </div>
+                  )}
                 </div>
               ))}
             </>
@@ -269,27 +355,29 @@ const PosMain = (props) => {
                 </div>
             )}
             
-            {/* ✨ NEW: Voucher & Discount Section */}
-            <div style={{marginBottom: '20px', padding: '16px', background: 'var(--bg-color)', borderRadius: '12px'}}>
-                <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
-                    <input 
-                        type="text" 
-                        placeholder="Kode Voucher (Cth: OPENING50)" 
-                        value={voucherCode}
-                        onChange={e => setVoucherCode(e.target.value.toUpperCase())}
-                        style={{flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', textTransform: 'uppercase', outline: 'none'}}
-                    />
-                    <button onClick={handleApplyVoucher} style={{background: 'var(--text-color)', color: 'white', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600'}}>Pakai</button>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
-                    <span style={{fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '500'}}>Diskon Manual:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'white', overflow: 'hidden' }}>
-                        <input type="number" value={discountInput} onChange={e => setDiscountInput(e.target.value)} onBlur={applyDiscount} style={{...styles.discountInput, width: '90px', border: 'none', borderRadius: 0}} placeholder="0" />
-                        <button onClick={() => {setDiscount({ type: 'percent', value: 0 }); setAppliedVoucher(null);}} style={{ ...styles.discountTypeBtn, padding: '4px 8px', fontSize: '0.8rem', background: discount.type === 'percent' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'percent' ? 'white' : 'var(--text-color)' }}>%</button>
-                        <button onClick={() => {setDiscount({ type: 'nominal', value: 0 }); setAppliedVoucher(null);}} style={{ ...styles.discountTypeBtn, padding: '4px 8px', fontSize: '0.8rem', background: discount.type === 'nominal' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'nominal' ? 'white' : 'var(--text-color)' }}>Rp</button>
-                    </div>
-                </div>
-            </div>
+            {/* ✨ NEW: Voucher & Discount Section (Disembunyikan saat mode split) */}
+            {!isSplitMode && (
+              <div style={{marginBottom: '15px', padding: '12px', background: 'var(--bg-color)', borderRadius: '12px'}}>
+                  <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>
+                      <input 
+                          type="text" 
+                          placeholder="Kode Voucher (Cth: OPENING50)" 
+                          value={voucherCode}
+                          onChange={e => setVoucherCode(e.target.value.toUpperCase())}
+                          style={{flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', textTransform: 'uppercase', outline: 'none'}}
+                      />
+                      <button onClick={handleApplyVoucher} style={{background: 'var(--text-color)', color: 'white', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600'}}>Pakai</button>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
+                      <span style={{fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '500'}}>Diskon Manual:</span>
+                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'white', overflow: 'hidden' }}>
+                          <input type="number" value={discountInput} onChange={e => setDiscountInput(e.target.value)} onBlur={applyDiscount} style={{...styles.discountInput, width: '90px', border: 'none', borderRadius: 0}} placeholder="0" />
+                          <button onClick={() => {setDiscount({ type: 'percent', value: 0 }); setAppliedVoucher(null);}} style={{ ...styles.discountTypeBtn, padding: '4px 8px', fontSize: '0.8rem', background: discount.type === 'percent' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'percent' ? 'white' : 'var(--text-color)' }}>%</button>
+                          <button onClick={() => {setDiscount({ type: 'nominal', value: 0 }); setAppliedVoucher(null);}} style={{ ...styles.discountTypeBtn, padding: '4px 8px', fontSize: '0.8rem', background: discount.type === 'nominal' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'nominal' ? 'white' : 'var(--text-color)' }}>Rp</button>
+                      </div>
+                  </div>
+              </div>
+            )}
 
             {cartTotals.discountAmount > 0 && (
               <div style={{ ...styles.posSummaryRow, color: 'var(--success-color)' }}>
@@ -321,12 +409,15 @@ const PosMain = (props) => {
 
             <div style={{ ...styles.posSummaryRow, ...styles.posSummaryRowTax }}><span>Pajak ({storeSettings.taxPercentage}%)</span><span>Rp {Math.round(cartTotals.tax).toLocaleString('id-ID')}</span></div>
             <div style={{ ...styles.posSummaryRow, ...styles.posSummaryRowTotal }}><span>Total</span><span>Rp {cartTotals.total.toLocaleString('id-ID')}</span></div>
-            <div style={styles.posCartButtons}>
-              <button onClick={holdCart} style={{ ...styles.posBtn, ...styles.posBtnHold }}>Tahan</button>
-              <button onClick={() => setActiveCart([])} style={{ ...styles.posBtn, ...styles.posBtnCancel }}>Batal</button>
-            </div>
             
-            <div style={{display:'flex', gap:'10px'}}>
+            {!isSplitMode && (
+              <div style={styles.posCartButtons}>
+                <button onClick={holdCart} style={{ ...styles.posBtn, ...styles.posBtnHold }}>Tahan</button>
+                <button onClick={() => setActiveCart([])} style={{ ...styles.posBtn, ...styles.posBtnCancel }}>Batal</button>
+              </div>
+            )}
+            
+            <div style={{display:'flex', gap:'10px', marginTop: isSplitMode ? '10px' : '0'}}>
                 {!isSplitMode && (
                     <button 
                         onClick={() => {
@@ -347,11 +438,12 @@ const PosMain = (props) => {
                 }}
                 style={{ ...styles.posBtn, ...styles.posBtnPay }}
                 >
-                {isSplitMode ? 'Bayar Sebagian' : 'Bayar'}
+                {isSplitMode ? 'Bayar Sebagian' : '💰 Bayar'}
                 </button>
             </div>
           </div>
         </div>
+      </div>
 
         {/* Payment Modal */}
         {showPaymentModal && (
@@ -675,7 +767,190 @@ const PosMain = (props) => {
             </div>
           </div>
         )}
-      </div>
+
+        {/* ✨ MODAL CATATAN & VARIAN CEPAT */}
+        {showNoteModal && noteItem && (
+          <div className="modal-overlay" style={{ zIndex: 3000 }}>
+            <div className="modal-content" style={{ maxWidth: '450px' }}>
+              <div className="modal-header">
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📝</span>
+                    Varian: {noteItem.name}
+                </h3>
+                <button onClick={() => setShowNoteModal(false)} className="modal-close">&times;</button>
+              </div>
+              <div className="modal-body">
+                 <div style={{ marginBottom: '20px', maxHeight: '280px', overflowY: 'auto', paddingRight: '5px' }}>
+                    {getDynamicVariantGroups(noteItem).map((group, gIdx) => (
+                        <div key={gIdx} style={{ marginBottom: '15px' }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b' }}>{group.title}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                               {group.tags.map(tag => {
+                                   const isSelected = currentTags.includes(tag);
+                                   return (
+                                       <button 
+                                         key={tag} 
+                                         type="button"
+                                         onClick={() => {
+                                             if (isSelected) {
+                                                 setNoteInput(currentTags.filter(t => t !== tag).join(', '));
+                                             } else {
+                                                 setNoteInput(noteInput ? `${noteInput}, ${tag}` : tag);
+                                             }
+                                         }}
+                                         style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid ${isSelected ? '#4f46e5' : '#cbd5e1'}`, background: isSelected ? '#4f46e5' : '#f8fafc', color: isSelected ? 'white' : '#475569', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                                       >
+                                         {isSelected ? '✓ ' : '+ '}{tag}
+                                       </button>
+                                   );
+                               })}
+                            </div>
+                        </div>
+                    ))}
+                 </div>
+                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#475569' }}>Catatan Kustom:</label>
+                 
+                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', minHeight: '100px', boxSizing: 'border-box', background: 'white', alignItems: 'flex-start', alignContent: 'flex-start' }}>
+                    {currentTags.map((tag, idx) => (
+                        <div key={idx} style={{ background: '#e0e7ff', color: '#4f46e5', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(79, 70, 229, 0.1)' }}>
+                            <span>{tag}</span>
+                            <button 
+                                onClick={() => setNoteInput(currentTags.filter((_, i) => i !== idx).join(', '))}
+                                style={{ background: '#c7d2fe', border: 'none', color: '#4f46e5', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', padding: 0, lineHeight: 1 }}
+                            >&times;</button>
+                        </div>
+                    ))}
+                    
+                    <input
+                        type="text"
+                        value={manualTag}
+                        onChange={(e) => setManualTag(e.target.value)}
+                        placeholder={currentTags.length === 0 ? "Ketik catatan lalu tekan Koma (,) atau Enter..." : "Ketik lagi..."}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                                e.preventDefault();
+                                const val = e.target.value.trim();
+                                if (val && !currentTags.includes(val)) {
+                                    setNoteInput(noteInput ? `${noteInput}, ${val}` : val);
+                                }
+                                setManualTag('');
+                            }
+                        }}
+                        style={{ flex: 1, border: 'none', outline: 'none', minWidth: '180px', fontSize: '0.95rem', background: 'transparent', padding: '6px 0', color: '#1e293b' }}
+                    />
+                 </div>
+                 
+                 <button onClick={() => {
+                     let finalNote = noteInput;
+                     if (manualTag.trim()) {
+                         finalNote = noteInput ? `${noteInput}, ${manualTag.trim()}` : manualTag.trim();
+                     }
+                     saveNote(finalNote);
+                     setManualTag('');
+                 }} style={{ ...styles.posBtnPay, marginTop: '20px', width: '100%', padding: '14px', background: 'var(--primary-color)' }}>
+                     Simpan Varian & Catatan
+                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✨ MODAL ADD TO CART (POPUP REVIEW MENU) */}
+        {showAddToCartModal && cartModalItem && (
+          <div className="modal-overlay" style={{ zIndex: 3000 }}>
+            <div className="modal-content" style={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+              <div className="modal-header" style={{ flexShrink: 0 }}>
+                <h3 style={{ margin: 0 }}>Review Pesanan</h3>
+                <button onClick={() => setShowAddToCartModal(false)} className="modal-close">&times;</button>
+              </div>
+              <div className="modal-body" style={{ overflowY: 'auto', padding: '20px' }}>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px' }}>
+                   <div style={{ width: '80px', height: '80px', borderRadius: '12px', background: '#f1f5f9', overflow: 'hidden', flexShrink: 0 }}>
+                      {cartModalItem.image ? <img src={cartModalItem.image} alt={cartModalItem.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <div style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>🍽️</div>}
+                   </div>
+                   <div>
+                      <h3 style={{ margin: '0 0 5px 0', fontSize: '1.2rem', color: '#1e293b' }}>{cartModalItem.name}</h3>
+                      <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1.1rem' }}>{cartModalItem.price}</p>
+                   </div>
+                </div>
+
+                {/* Stepper Jumlah Porsi Minimalis & Teks Jelas */}
+                <div style={{ marginBottom: '15px', background: '#f8fafc', padding: '10px 15px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold', color: '#475569', fontSize: '1rem' }}>Jumlah Porsi:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '4px', borderRadius: '8px', border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                        <button onClick={() => setCartModalQty(Math.max(1, cartModalQty - 1))} style={{ width: '34px', height: '30px', borderRadius: '6px', border: 'none', background: '#f1f5f9', color: '#475569', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', padding: 0, lineHeight: 1 }}>−</button>
+                        <span style={{ fontSize: '1rem', fontWeight: '900', color: '#0f172a', minWidth: '24px', textAlign: 'center' }}>{cartModalQty}</span>
+                        <button onClick={() => setCartModalQty(cartModalQty + 1)} style={{ width: '34px', height: '30px', borderRadius: '6px', border: 'none', background: 'var(--primary-color)', color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)', padding: 0, lineHeight: 1 }}>+</button>
+                    </div>
+                </div>
+
+                {/* Varian Pilihan Cepat */}
+                <div style={{ marginBottom: '20px' }}>
+                    <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#475569' }}>Varian & Kustomisasi:</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {getDynamicVariantGroups(cartModalItem).map((group, gIdx) => (
+                            <div key={gIdx}>
+                                <p style={{ margin: '0 0 6px 0', fontSize: '0.85rem', color: '#64748b' }}>{group.title}</p>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                   {group.tags.map(tag => {
+                                       const isSelected = cartModalCurrentTags.includes(tag);
+                                       return (
+                                           <button 
+                                             key={tag} 
+                                             type="button"
+                                             onClick={() => {
+                                                 if (isSelected) setCartModalNote(cartModalCurrentTags.filter(t => t !== tag).join(', '));
+                                                 else setCartModalNote(cartModalNote ? `${cartModalNote}, ${tag}` : tag);
+                                             }}
+                                             style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid ${isSelected ? 'var(--primary-color)' : '#cbd5e1'}`, background: isSelected ? 'var(--primary-color)' : '#f8fafc', color: isSelected ? 'white' : '#475569', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                                           >
+                                             {isSelected ? '✓ ' : '+ '}{tag}
+                                           </button>
+                                       );
+                                   })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Catatan Kustom */}
+                <div>
+                    <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#475569' }}>Catatan Lainnya:</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', minHeight: '80px', boxSizing: 'border-box', background: 'white', alignContent: 'flex-start' }}>
+                        {cartModalCurrentTags.map((tag, idx) => (
+                            <div key={idx} style={{ background: '#e0e7ff', color: '#4f46e5', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>{tag}</span>
+                                <button onClick={() => setCartModalNote(cartModalCurrentTags.filter((_, i) => i !== idx).join(', '))} style={{ background: 'transparent', border: 'none', color: '#4f46e5', cursor: 'pointer', fontSize: '1rem', padding: 0, lineHeight: 1 }}>&times;</button>
+                            </div>
+                        ))}
+                        <input
+                            type="text"
+                            value={cartModalManualTag}
+                            onChange={(e) => setCartModalManualTag(e.target.value)}
+                            placeholder={cartModalCurrentTags.length === 0 ? "Ketik catatan lalu Enter..." : "Ketik lagi..."}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
+                                    const val = e.target.value.trim();
+                                    if (val && !cartModalCurrentTags.includes(val)) {
+                                        setCartModalNote(cartModalNote ? `${cartModalNote}, ${val}` : val);
+                                    }
+                                    setCartModalManualTag('');
+                                }
+                            }}
+                            style={{ flex: 1, border: 'none', outline: 'none', minWidth: '150px', fontSize: '0.95rem', background: 'transparent', padding: '4px 0', color: '#1e293b' }}
+                        />
+                    </div>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ flexShrink: 0, background: '#f8fafc', padding: '15px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '10px' }}>
+                 <button onClick={() => setShowAddToCartModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', color: '#475569', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
+                 <button onClick={confirmAddToCart} style={{ flex: 2, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--primary-color)', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(79, 70, 229, 0.2)' }}>Tambahkan ({cartModalQty} Porsi)</button>
+              </div>
+            </div>
+          </div>
+        )}
     </>
   );
 };
