@@ -67,13 +67,13 @@ const ShiftReport = () => {
     const tableColumn = ["Waktu Tutup", "Kasir", "Modal Awal", "Penjualan", "Kas In/Out", "Diharapkan", "Fisik Laci", "Selisih"];
     const tableRows = filteredShifts.map(s => [
       formatDateTime(s.endTime),
-      s.username,
-      `Rp ${s.startCash.toLocaleString('id-ID')}`,
-      `Rp ${s.totalSales.toLocaleString('id-ID')}`,
-      `Rp ${(s.cashInOp || 0) - (s.cashOutOp || 0)}`,
-      `Rp ${s.expectedCash.toLocaleString('id-ID')}`,
-      `Rp ${s.endCash.toLocaleString('id-ID')}`,
-      s.difference > 0 ? `+Rp ${s.difference.toLocaleString('id-ID')}` : `Rp ${s.difference.toLocaleString('id-ID')}`
+      s.username || '-',
+      `Rp ${(s.startCash || 0).toLocaleString('id-ID')}`,
+      `Rp ${(s.totalSales || 0).toLocaleString('id-ID')}`,
+      `Rp ${((s.cashInOp || 0) - (s.cashOutOp || 0)).toLocaleString('id-ID')}`,
+      `Rp ${(s.expectedCash || 0).toLocaleString('id-ID')}`,
+      `Rp ${(s.endCash || 0).toLocaleString('id-ID')}`,
+      (s.difference || 0) > 0 ? `+Rp ${(s.difference || 0).toLocaleString('id-ID')}` : `Rp ${(s.difference || 0).toLocaleString('id-ID')}`
     ]);
 
     autoTable(doc, {
@@ -166,20 +166,20 @@ const ShiftReport = () => {
                           {formatDateTime(shift.startTime)} s/d<br/>{formatDateTime(shift.endTime)}
                         </div>
                       </td>
-                      <td style={{ padding: '15px 20px', color: '#64748b' }}>Rp {shift.startCash.toLocaleString('id-ID')}</td>
+                      <td style={{ padding: '15px 20px', color: '#64748b' }}>Rp {(shift.startCash || 0).toLocaleString('id-ID')}</td>
                       <td style={{ padding: '15px 20px' }}>
-                        <div style={{ color: '#10b981', fontWeight: '600' }}>Tunai: Rp {shift.cashSales.toLocaleString('id-ID')}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Non-Tunai: Rp {shift.nonCashSales.toLocaleString('id-ID')}</div>
+                        <div style={{ color: '#10b981', fontWeight: '600' }}>Tunai: Rp {(shift.cashSales || 0).toLocaleString('id-ID')}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Non-Tunai: Rp {(shift.nonCashSales || 0).toLocaleString('id-ID')}</div>
                       </td>
                       <td style={{ padding: '15px 20px', fontSize: '0.9rem' }}>
                         <span style={{ color: '#10b981' }}>In: Rp {(shift.cashInOp || 0).toLocaleString('id-ID')}</span><br/>
                         <span style={{ color: '#ef4444' }}>Out: Rp {(shift.cashOutOp || 0).toLocaleString('id-ID')}</span>
                       </td>
                       <td style={{ padding: '15px 20px', fontWeight: 'bold', color: '#3b82f6' }}>
-                        Rp {shift.expectedCash.toLocaleString('id-ID')}
+                        Rp {(shift.expectedCash || 0).toLocaleString('id-ID')}
                       </td>
                       <td style={{ padding: '15px 20px', fontWeight: 'bold', color: '#1e293b' }}>
-                        Rp {shift.endCash.toLocaleString('id-ID')}
+                        Rp {(shift.endCash || 0).toLocaleString('id-ID')}
                       </td>
                       <td style={{ padding: '15px 20px', textAlign: 'center' }}>
                         <span style={{ 

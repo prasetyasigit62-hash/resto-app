@@ -1,190 +1,211 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'inventory_controller.dart';
+import 'material_model.dart';
 import 'app_colors.dart';
 
-class InventoryScreen extends StatelessWidget {
+class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
 
   @override
+  ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
+}
+
+class _InventoryScreenState extends ConsumerState<InventoryScreen> {
+  String searchTerm = '';
+  String filterType = 'all'; // 'all', 'low'
+
+  @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width >= 800;
+    final materialsAsync = ref.watch(materialsProvider);
 
-    final List<Map<String, dynamic>> inventories = [
-      {
-        'name': 'Beras Putih',
-        'stock': 2,
-        'unit': 'KG',
-        'min': 5,
-        'cost': 15000,
-      },
-      {
-        'name': 'Minyak Goreng',
-        'stock': 8,
-        'unit': 'L',
-        'min': 3,
-        'cost': 18000,
-      },
-      {
-        'name': 'Daging Ayam',
-        'stock': 15,
-        'unit': 'KG',
-        'min': 10,
-        'cost': 35000,
-      },
-      {
-        'name': 'Telur Ayam',
-        'stock': 30,
-        'unit': 'Butir',
-        'min': 50,
-        'cost': 2000,
-      },
-      {
-        'name': 'Bawang Merah',
-        'stock': 1,
-        'unit': 'KG',
-        'min': 2,
-        'cost': 25000,
-      },
-    ];
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Manajemen Inventori',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add),
-                label: const Text('Tambah Barang'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Manajemen Inventori'),
+        backgroundColor: AppColors.bgLight,
+        elevation: 1,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header & Tombol Tambah
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Text(
+                    '📦 Inventori Bahan',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.cardLight,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderLight),
-            ),
-            child: isDesktop
-                ? DataTable(
-                    headingTextStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textMutedLight,
-                    ),
-                    columns: const [
-                      DataColumn(label: Text('Nama Bahan')),
-                      DataColumn(label: Text('Stok Tersedia')),
-                      DataColumn(label: Text('Stok Minimum')),
-                      DataColumn(label: Text('Harga Beli Terakhir')),
-                      DataColumn(label: Text('Status')),
-                      DataColumn(label: Text('Aksi')),
-                    ],
-                    rows: inventories.map((item) {
-                      final isCritical = item['stock'] <= item['min'];
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                            Text(
-                              item['name'],
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          DataCell(Text('${item['stock']} ${item['unit']}')),
-                          DataCell(Text('${item['min']} ${item['unit']}')),
-                          DataCell(Text('Rp ${item['cost']}')),
-                          DataCell(
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isCritical
-                                    ? AppColors.danger.withOpacity(0.1)
-                                    : AppColors.success.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                isCritical ? 'Kritis' : 'Aman',
-                                style: TextStyle(
-                                  color: isCritical
-                                      ? AppColors.danger
-                                      : AppColors.success,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.edit_outlined,
-                                    color: AppColors.primary,
-                                  ),
-                                  onPressed: () {},
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: AppColors.danger,
-                                  ),
-                                  onPressed: () {},
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: inventories.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final item = inventories[index];
-                      final isCritical = item['stock'] <= item['min'];
-                      return ListTile(
-                        title: Text(
-                          item['name'],
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          'Sisa: ${item['stock']} ${item['unit']} (Min: ${item['min']})',
-                        ),
-                        trailing: Icon(
-                          isCritical ? Icons.warning : Icons.check_circle,
-                          color: isCritical
-                              ? AppColors.danger
-                              : AppColors.success,
-                        ),
-                      );
-                    },
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // TODO: Implementasi modal tambah
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Fitur Tambah belum siap.')),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Tambah'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
                   ),
-          ),
-        ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Filter Tabs
+            Row(
+              children: [
+                FilterChip(
+                  label: const Text('Semua Bahan'),
+                  selected: filterType == 'all',
+                  onSelected: (selected) {
+                    if (selected) setState(() => filterType = 'all');
+                  },
+                ),
+                const SizedBox(width: 10),
+                FilterChip(
+                  label: const Text('⚠️ Stok Menipis'),
+                  selected: filterType == 'low',
+                  onSelected: (selected) {
+                    if (selected) setState(() => filterType = 'low');
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Grid Items
+            Expanded(
+              child: materialsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, stack) => Center(child: Text('Error: $err')),
+                data: (materials) {
+                  final filteredMaterials = materials.where((item) {
+                    final matchesFilter = filterType == 'low'
+                        ? item.totalStock <= item.minStock
+                        : true;
+                    return matchesFilter;
+                  }).toList();
+
+                  if (filteredMaterials.isEmpty) {
+                    return const Center(
+                        child: Text('Tidak ada bahan yang ditemukan.'));
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () => ref.refresh(materialsProvider.future),
+                    child: GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 300,
+                        childAspectRatio: 1.5,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
+                      itemCount: filteredMaterials.length,
+                      itemBuilder: (context, index) {
+                        final item = filteredMaterials[index];
+                        return _buildMaterialCard(item);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialCard(MaterialModel item) {
+    final isLow = item.totalStock <= item.minStock;
+    final currencyFormatter =
+        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Cost: ${currencyFormatter.format(item.lastPrice)} / ${item.unit}',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textMutedLight),
+                      ),
+                    ],
+                  ),
+                ),
+                Chip(
+                  label: Text(isLow ? 'Low Stock' : 'Aman'),
+                  backgroundColor: isLow
+                      ? AppColors.danger.withOpacity(0.1)
+                      : AppColors.success.withOpacity(0.1),
+                  labelStyle: TextStyle(
+                      color: isLow ? AppColors.danger : AppColors.success,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    text: '${item.totalStock}',
+                    style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: isLow ? AppColors.danger : AppColors.textLight),
+                    children: [
+                      TextSpan(
+                        text: ' ${item.unit}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                            color: AppColors.textMutedLight),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isLow)
+                  Text(
+                    'Min. Stok: ${item.minStock}',
+                    style:
+                        const TextStyle(fontSize: 12, color: AppColors.danger),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -15,7 +15,7 @@ const CustomerPortal = ({ user, onLogout }) => {
 
     // Promo Banner Simulasi (Cross-Selling Ekosistem)
     const promos = [
-        { id: 1, title: 'Diskon 50% Fine Dining', subtitle: 'Khusus pengguna baru Superapp di Resto Bintang 5', image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=80', color: '#f59e0b' },
+        { id: 1, title: 'Diskon 50% Fine Dining', subtitle: 'Khusus pengguna baru Resto-app di Resto Bintang 5', image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=80', color: '#f59e0b' },
         { id: 2, title: 'Staycation Hemat', subtitle: 'Cashback 20% booking kamar hotel akhir pekan ini', image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80', color: '#3b82f6' },
         { id: 3, title: 'Midnight Sale Mall', subtitle: 'Tukarkan poin loyalty Anda untuk ekstra diskon', image: 'https://images.unsplash.com/photo-1519999482648-25049ddd37b1?auto=format&fit=crop&w=800&q=80', color: '#8b5cf6' }
     ];
@@ -47,7 +47,7 @@ const CustomerPortal = ({ user, onLogout }) => {
     // Rekomendasi Spesial (Untuk memenuhi layout bawah)
     const recommendations = [
         { id: 1, title: 'Kopi Sultan Promo', desc: 'Cashback 50% pakai E-Wallet Mall di Food Court.', image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=400&q=80' },
-        { id: 2, title: 'Nonton Bioskop Nyaman', desc: 'Beli 1 Gratis 1 Tiket Premiere XXI Superapp Mall.', image: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=400&q=80' },
+        { id: 2, title: 'Nonton Bioskop Nyaman', desc: 'Beli 1 Gratis 1 Tiket Premiere XXI Resto-app Mall.', image: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=400&q=80' },
         { id: 3, title: 'Flash Sale Hotel', desc: 'Kamar Superior cuma Rp 399rb khusus malam ini!', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80' }
     ];
 
@@ -125,8 +125,8 @@ const CustomerPortal = ({ user, onLogout }) => {
                 {/* Header Navbar */}
                 <header className="portal-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div className="brand-logo">S</div>
-                        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '900', color: '#1e293b', letterSpacing: '-0.5px' }}>Super<span style={{ color: '#4f46e5' }}>app</span></h1>
+                        <div className="brand-logo">R</div>
+                        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '900', color: '#1e293b', letterSpacing: '-0.5px' }}>Resto-app</h1>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <button onClick={onLogout} style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '8px 16px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#fecaca'} onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}>
@@ -145,7 +145,7 @@ const CustomerPortal = ({ user, onLogout }) => {
                                 
                                 <div className="loyalty-card">
                                     <div>
-                                        <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '5px', fontWeight: '600', textTransform: 'uppercase' }}>Superapp Member</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '5px', fontWeight: '600', textTransform: 'uppercase' }}>Resto-app Member</div>
                                         <div className="loyalty-tier">GOLD TIER</div>
                                         <div style={{ marginTop: '15px', display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
                                             <span style={{ fontSize: '2.2rem', fontWeight: '900', lineHeight: 1 }}>{user.points || '0'}</span>
@@ -235,7 +235,7 @@ const CustomerPortal = ({ user, onLogout }) => {
 
                     {/* Mini Footer */}
                     <div style={{ textAlign: 'center', marginTop: '60px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '500', animation: 'fadeUp 1s ease-out forwards' }}>
-                        &copy; {new Date().getFullYear()} Superapp Ecosystem.
+                        &copy; {new Date().getFullYear()} Resto-app.
                     </div>
                 </main>
             </div>

@@ -45,10 +45,12 @@ export const useOrders = () => {
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       if (filters.status !== 'all' && order.status !== filters.status) return false;
-      if (filters.search &&
-        !(order.customerName?.toLowerCase() || '').includes(filters.search.toLowerCase()) &&
-        !String(order.id).includes(filters.search)) {
-        return false;
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const matchName = (order.customerName?.toLowerCase() || '').includes(q);
+        const matchId = String(order.id).includes(q);
+        const matchTracking = (order.trackingNumber?.toLowerCase() || '').includes(q);
+        if (!matchName && !matchId && !matchTracking) return false;
       }
       const orderDate = new Date(order.date);
       if (filters.startDate && new Date(filters.startDate) > orderDate) return false;

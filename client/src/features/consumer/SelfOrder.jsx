@@ -23,7 +23,7 @@ const SelfOrder = ({ tableId }) => {
     <div style={styles.container}>
       <ToastContainer position="top-center" autoClose={3000} theme="light" />
       <header style={styles.header}>
-        <h1 style={styles.title}>🍽️ Superapp Resto</h1>
+        <h1 style={styles.title}>🍽️ Resto-app</h1>
         <p style={styles.subtitle}>Pesan menu favorit Anda untuk <span style={styles.tableNumber}>{displayLocation}</span></p>
       </header>
 

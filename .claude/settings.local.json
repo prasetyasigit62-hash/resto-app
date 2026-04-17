@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "Bash(awk '/^app\\\\.\\(get|post|put|delete\\).*inventory|^app\\\\.\\(get|post|put|delete\\).*\\\\/api\\\\/restoran|^app\\\\.\\(get|post|put|delete\\).*menu|^app\\\\.\\(get|post|put|delete\\).*product|^app\\\\.\\(get|post|put|delete\\).*category/ {print NR\": \"$0}' /c/resto-app/server/index.js)",
+      "Bash(awk '/app\\\\.get\\\\\\(.*restoran/,/\\\\}\\\\\\);/' /c/resto-app/server/index.js)",
+      "Bash(awk '/app.get.*:service.*readData/,/res\\\\.json/' /c/resto-app/server/index.js)",
+      "Bash(find client/src -name \"App.jsx\" -exec head -100 {} \\\\;)",
+      "Bash(node -e \"require\\('./index.js'\\)\")",
+      "Bash(find \"c:/resto-app/client/src\" -type f \\\\\\( -name \"*.jsx\" -o -name \"*.js\" -o -name \"*.json\" \\\\\\) -exec grep -l \"Operasional Restoran\\\\|operasional\\\\|menu\" {} \\\\;)",
+      "Bash(find \"c:/resto-app\" -type f \\\\\\( -name \"*.json\" -o -name \"*.js\" \\\\\\) -exec grep -l \"Operasional Restoran\\\\|menu.*config\\\\|categories\" {} \\\\;)"
+    ]
+  }
+}

@@ -74,8 +74,8 @@ const Restoran = ({ data, onDelete, onEdit, onView, selectedIds, onSelectionChan
                 </div>
                 <div style={styles.gridActions}>
                   <button className="action-btn-grid btn-view" onClick={() => onView(item)}>👁️ Detail</button>
-                  {user.role === 'admin' && <button className="action-btn-grid btn-edit" onClick={() => onEdit(item)}>✏️</button>}
-                  {user.role === 'admin' && <button className="action-btn-grid btn-del" onClick={() => onDelete(item.id)}>🗑️</button>}
+                  {['admin', 'ADMIN', 'OWNER', 'SUPERADMIN', 'superadmin'].includes(user?.role) && <button className="action-btn-grid btn-edit" onClick={() => onEdit(item)}>✏️</button>}
+                  {['admin', 'ADMIN', 'OWNER', 'SUPERADMIN', 'superadmin'].includes(user?.role) && <button className="action-btn-grid btn-del" onClick={() => onDelete(item.id)}>🗑️</button>}
                 </div>
               </div>
             </div>
@@ -141,8 +141,8 @@ const Restoran = ({ data, onDelete, onEdit, onView, selectedIds, onSelectionChan
                   <td style={{ ...styles.cell, textAlign: 'center' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                       <button className="view-btn" onClick={() => onView(item)} title="Lihat Detail" style={{background:'#eff6ff', color:'#3b82f6', border:'none', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer'}}>👁️</button>
-                      {user.role === 'admin' && <button className="edit-btn" onClick={() => onEdit(item)} title="Edit Data" style={{background:'#fef3c7', color:'#d97706', border:'none', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer'}}>✏️</button>}
-                      {user.role === 'admin' && <button className="delete-btn" onClick={() => onDelete(item.id)} title="Hapus Data" style={{background:'#fee2e2', color:'#ef4444', border:'none', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer'}}>🗑️</button>}
+                      {['OWNER', 'ADMIN', 'SUPERADMIN', 'admin', 'superadmin'].includes(user?.role) && <button className="edit-btn" onClick={() => onEdit(item)} title="Edit Data" style={{background:'#fef3c7', color:'#d97706', border:'none', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer'}}>✏️</button>}
+                      {['OWNER', 'ADMIN', 'SUPERADMIN', 'admin', 'superadmin'].includes(user?.role) && <button className="delete-btn" onClick={() => onDelete(item.id)} title="Hapus Data" style={{background:'#fee2e2', color:'#ef4444', border:'none', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer'}}>🗑️</button>}
                     </div>
                   </td>
                 </tr>

@@ -34,7 +34,162 @@
   --table-row-hover: #333333;
   --input-bg: #2d2d2d;
   --input-border: #444;
+  color-scheme: dark;
 }
+
+/* ========================================
+   DARK MODE GLOBAL OVERRIDES
+   Mengatasi inline style hardcoded light colors
+   ======================================== */
+
+/* Heading & teks */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] p,
+[data-theme="dark"] span,
+[data-theme="dark"] label,
+[data-theme="dark"] td,
+[data-theme="dark"] th,
+[data-theme="dark"] li {
+  color: inherit;
+}
+
+/* Card & container utama */
+[data-theme="dark"] .service-view,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .modal-overlay > div {
+  background: var(--card-bg) !important;
+  color: var(--text-color) !important;
+}
+
+/* Semua form input, select, textarea */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--input-bg) !important;
+  color: var(--text-color) !important;
+  border-color: var(--input-border) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.7;
+}
+
+/* Tabel */
+[data-theme="dark"] .data-table thead tr,
+[data-theme="dark"] table thead tr {
+  background: var(--table-header-bg) !important;
+  color: var(--table-header-text) !important;
+}
+
+[data-theme="dark"] .data-table thead th,
+[data-theme="dark"] table thead th {
+  background: var(--table-header-bg) !important;
+  color: var(--table-header-text) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .data-table tbody tr:hover,
+[data-theme="dark"] table tbody tr:hover {
+  background: var(--table-row-hover) !important;
+}
+
+[data-theme="dark"] .data-table tbody td,
+[data-theme="dark"] table tbody td {
+  border-color: var(--border-color) !important;
+}
+
+/* Card dengan background putih */
+[data-theme="dark"] [style*="background: #ffffff"],
+[data-theme="dark"] [style*="background:#ffffff"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background-color: white"],
+[data-theme="dark"] [style*="background-color: #ffffff"],
+[data-theme="dark"] [style*="background-color: #fff"] {
+  background: var(--card-bg) !important;
+  color: var(--text-color) !important;
+}
+
+/* Background abu terang (f8fafc, f9fafb, f3f4f6, f1f5f9) */
+[data-theme="dark"] [style*="background: #f8fafc"],
+[data-theme="dark"] [style*="background: #f9fafb"],
+[data-theme="dark"] [style*="background: #f3f4f6"],
+[data-theme="dark"] [style*="background: #f1f5f9"],
+[data-theme="dark"] [style*="background-color: #f8fafc"],
+[data-theme="dark"] [style*="background-color: #f9fafb"],
+[data-theme="dark"] [style*="background-color: #f3f4f6"],
+[data-theme="dark"] [style*="background-color: #f1f5f9"] {
+  background: #262626 !important;
+}
+
+/* Warna teks gelap hardcoded */
+[data-theme="dark"] [style*="color: #1e293b"],
+[data-theme="dark"] [style*="color: #0f172a"],
+[data-theme="dark"] [style*="color: #111827"],
+[data-theme="dark"] [style*="color: #1f2937"],
+[data-theme="dark"] [style*="color: #334155"],
+[data-theme="dark"] [style*="color: rgb(30, 41, 59)"] {
+  color: var(--text-color) !important;
+}
+
+/* Warna teks muted hardcoded */
+[data-theme="dark"] [style*="color: #64748b"],
+[data-theme="dark"] [style*="color: #475569"],
+[data-theme="dark"] [style*="color: #94a3b8"],
+[data-theme="dark"] [style*="color: #6b7280"],
+[data-theme="dark"] [style*="color: #555"],
+[data-theme="dark"] [style*="color: #666"],
+[data-theme="dark"] [style*="color: #888"] {
+  color: var(--text-muted) !important;
+}
+
+/* Modal header sticky */
+[data-theme="dark"] [style*="background: rgba(255, 255, 255"],
+[data-theme="dark"] [style*="background: rgba(255,255,255"] {
+  background: rgba(30, 30, 30, 0.97) !important;
+}
+
+/* Border terang */
+[data-theme="dark"] [style*="border: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border: 1.5px solid #cbd5e1"],
+[data-theme="dark"] [style*="border-bottom: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom: 1px solid #f1f5f9"] {
+  border-color: var(--border-color) !important;
+}
+
+/* Sticky header di modal */
+[data-theme="dark"] [style*="position: sticky"] {
+  background: var(--card-bg) !important;
+}
+
+/* Topbar */
+[data-theme="dark"] .topbar {
+  background: var(--header-bg) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+
+/* Summary card di dashboard/shift */
+[data-theme="dark"] [style*="background: var(--card-bg)"] {
+  color: var(--text-color);
+}
+
+/* Select option */
+[data-theme="dark"] option {
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+/* Scrollbar */
+[data-theme="dark"] ::-webkit-scrollbar-track { background: #1e1e1e; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #555; }
 
 /* --- GLOBAL LAYOUT --- */
 .app-layout {

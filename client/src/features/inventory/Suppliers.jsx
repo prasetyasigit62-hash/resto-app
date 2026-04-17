@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
-const Suppliers = ({ setConfirmModal }) => {
+const Suppliers = ({ setConfirmModal, user }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -92,7 +92,10 @@ const Suppliers = ({ setConfirmModal }) => {
             if (res.ok) {
               toast.success('Supplier berhasil dihapus.');
               fetchSuppliers();
-            } else { toast.error('Gagal menghapus supplier.'); }
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              toast.error(errData.error || 'Gagal menghapus supplier.');
+            }
           } catch (err) { toast.error('Gagal menghapus.'); }
           setConfirmModal(prev => ({ ...prev, show: false }));
         }
@@ -107,13 +110,20 @@ const Suppliers = ({ setConfirmModal }) => {
           <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#1e293b' }}>🚚 Manajemen Supplier</h2>
           <p style={{ color: '#64748b' }}>Database kontak pemasok bahan baku.</p>
         </div>
-        <button onClick={() => openModal()} className="profile-save-btn" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>+</span> Tambah Supplier
-        </button>
+        {['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role) && (
+          <button onClick={() => openModal()} className="profile-save-btn" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>+</span> Tambah Supplier
+          </button>
+        )}
       </div>
 
       {loading ? <p>Memuat...</p> : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+          {suppliers.length === 0 && (
+            <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#94a3b8', padding: '40px' }}>
+              Belum ada data supplier. Tambahkan supplier pertama Anda.
+            </p>
+          )}
           {suppliers.map(s => (
             <div key={s.id} style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
@@ -139,10 +149,12 @@ const Suppliers = ({ setConfirmModal }) => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
-                <button onClick={() => openModal(s)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'white', cursor: 'pointer', fontWeight: '600', color: '#475569' }}>Edit</button>
-                <button onClick={() => handleDelete(s)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontWeight: '600', color: '#ef4444' }}>Hapus</button>
-              </div>
+              {['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role) && (
+                <div style={{ display: 'flex', gap: '10px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
+                  <button onClick={() => openModal(s)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'white', cursor: 'pointer', fontWeight: '600', color: '#475569' }}>Edit</button>
+                  <button onClick={() => handleDelete(s)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontWeight: '600', color: '#ef4444' }}>Hapus</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

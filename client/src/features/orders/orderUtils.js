@@ -52,16 +52,23 @@ export const handlePrintInvoice = (order) => {
           <thead>
             <tr>
               <th>Item</th>
+              <th style="text-align:center">Qty</th>
               <th style="text-align:right">Harga</th>
+              <th style="text-align:right">Subtotal</th>
             </tr>
           </thead>
           <tbody>
-            ${order.items.map(item => `
+            ${order.items.map(item => {
+              const priceNum = item.price ? Number(String(item.price).replace(/[^0-9]/g, '')) : 0;
+              const qty = item.qty || 1;
+              return `
               <tr>
-                <td>${item.name} <br><small>(${item.service})</small></td>
-                <td style="text-align:right">${item.price || '-'}</td>
+                <td>${item.name}${item.note ? `<br><small style="color:#856404;background:#fff3cd;padding:1px 4px;border-radius:3px">📝 ${item.note}</small>` : ''}<br><small>(${item.service})</small></td>
+                <td style="text-align:center;font-weight:bold">${qty}x</td>
+                <td style="text-align:right">Rp ${priceNum.toLocaleString('id-ID')}</td>
+                <td style="text-align:right;font-weight:bold">Rp ${(priceNum * qty).toLocaleString('id-ID')}</td>
               </tr>
-            `).join('')}
+            `}).join('')}
           </tbody>
         </table>
         <div class="total">

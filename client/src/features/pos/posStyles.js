@@ -6,9 +6,9 @@ export const styles = {
   posCategoryList: { display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' },
   categoryPill: { padding: '8px 16px', borderRadius: '20px', border: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem', fontWeight: '500' },
   categoryPillActive: { backgroundColor: 'var(--primary-color)', color: 'white', borderColor: 'var(--primary-color)' },
-  // Gunakan minmax lebih kecil (130px) dan align-content start agar tidak renggang ke bawah
-  posMenuGrid: { flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', paddingRight: '5px', alignContent: 'start' },
-  posItemImageWrapper: { width: '100%', height: '80px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'var(--bg-color)', position: 'relative', marginBottom: '8px' },
+  // Gunakan minmax proporsional agar gambar dan kartu menu lebih besar
+  posMenuGrid: { flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px', paddingRight: '5px', alignContent: 'start' },
+  posItemImageWrapper: { width: '100%', height: '120px', borderRadius: '8px', overflow: 'hidden', backgroundColor: 'var(--bg-color)', position: 'relative', marginBottom: '10px' },
   posItemImage: { width: '100%', height: '100%', objectFit: 'cover' },
   posItemPlaceholderImage: { fontSize: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' },
   posItemStockOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', borderRadius: '8px' },

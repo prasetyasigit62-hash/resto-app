@@ -88,7 +88,8 @@ export const useSelfOrder = (tableId) => {
       const res = await fetch(`${backendUrl}/api/public/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart, total: cartTotal, tableNumber: decodeURIComponent(tableId).replace(/-/g, ' '), paymentMethod: 'Bayar di Kasir', status: 'Need_Confirmation' }),
+        // ✨ FIX: Menyamakan key 'address' untuk table dengan sistem V2
+        body: JSON.stringify({ items: cart, total: cartTotal, address: decodeURIComponent(tableId).replace(/-/g, ' '), paymentMethod: 'Open Bill', status: 'Need_Confirmation' }),
       });
       const result = await res.json();
       if (res.ok) {

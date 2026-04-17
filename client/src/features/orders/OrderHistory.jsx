@@ -136,7 +136,7 @@ const OrderHistory = ({ onBack }) => {
               <div key={order.id} style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '15px', marginBottom: '15px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: '800', color: '#1e293b' }}>Order #{order.id}</span>
+                    <span style={{ fontWeight: '800', color: '#1e293b' }}>Order {order.trackingNumber || `#${String(order.id).slice(0,8)}`}</span>
                     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{new Date(order.date).toLocaleDateString('id-ID')}</span>
                   </div>
                   <span style={{ 
@@ -192,7 +192,7 @@ const OrderHistory = ({ onBack }) => {
                 <button onClick={() => setShowPaymentGateway(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
             </div>
             <div style={{ padding: '30px 20px', textAlign: 'center' }}>
-                <p style={{ margin: '0 0 5px 0', color: '#64748b' }}>Total Tagihan (Order #{pgOrder.id})</p>
+                  <p style={{ margin: '0 0 5px 0', color: '#64748b' }}>Total Tagihan (Order {pgOrder.trackingNumber || `#${String(pgOrder.id).slice(0,8)}`})</p>
                 <h2 style={{ margin: '0 0 30px 0', fontSize: '2.2rem', color: '#1e293b' }}>Rp {Number(pgOrder.total).toLocaleString('id-ID')}</h2>
                 
                 <div style={{ display: 'grid', gap: '15px' }}>
@@ -201,7 +201,7 @@ const OrderHistory = ({ onBack }) => {
                     <button onClick={() => executePaymentGateway('BCA Virtual Account')} style={{ background: '#0066ae', color: 'white', border: 'none', padding: '15px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>🏦</span> BCA Virtual Account</button>
                     <button onClick={() => executePaymentGateway('Credit Card')} style={{ background: '#1e293b', color: 'white', border: 'none', padding: '15px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>💳</span> Credit / Debit Card</button>
                 </div>
-                <p style={{ marginTop: '20px', fontSize: '0.8rem', color: '#94a3b8' }}>Secure environment simulated by Superapp Backend.</p>
+                <p style={{ marginTop: '20px', fontSize: '0.8rem', color: '#94a3b8' }}>Secure environment simulated by Resto-app Backend.</p>
             </div>
           </div>
         </div>

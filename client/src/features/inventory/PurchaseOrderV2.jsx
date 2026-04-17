@@ -164,7 +164,7 @@ const PurchaseOrderV2 = ({ user }) => {
                <div style={{ textAlign: 'right' }}>
                    <div style={{ fontSize: '1.4rem', fontWeight: '900', color: '#3b82f6', marginBottom: '10px' }}>Rp {po.totalAmount.toLocaleString('id-ID')}</div>
                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                       {po.status === 'PENDING_APPROVAL' && user.role === 'OWNER' && (
+                       {po.status === 'PENDING_APPROVAL' && ['OWNER', 'ADMIN'].includes(user?.role) && (
                            <><button onClick={() => updateStatus(po.id, 'APPROVED')} style={{ background: '#0284c7', color: 'white', padding: '6px 12px', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>✅ Approve</button>
                            <button onClick={() => updateStatus(po.id, 'REJECTED')} style={{ background: '#dc2626', color: 'white', padding: '6px 12px', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>❌ Tolak</button></>
                        )}
@@ -217,7 +217,7 @@ const PurchaseOrderV2 = ({ user }) => {
                   </div>
                 )}
               </div>
-              <button type="submit" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', fontWeight: '800', borderRadius: '14px', display: 'flex', justifyContent: 'center', gap: '10px', alignItems: 'center', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)', color: 'white', border: 'none', cursor: 'pointer' }}><span>📤</span> Buat Draft PO</button>
+              <button type="submit" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', fontWeight: '800', borderRadius: '14px', display: 'flex', justifyContent: 'center', gap: '10px', alignItems: 'center', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)', color: 'white', border: 'none', cursor: 'pointer' }}><span>📤</span> Buat & Ajukan PO</button>
             </form>
           </div>
         </div>

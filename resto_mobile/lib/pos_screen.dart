@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_colors.dart';
 
@@ -88,12 +89,11 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   List<Map<String, dynamic>> get _filteredMenus {
-    return _menus.filter((item) {
+    return _menus.where((item) {
       final matchSearch = item['name'].toString().toLowerCase().contains(
-        _searchTerm.toLowerCase(),
-      );
-      final matchCat =
-          _activeCategory == 'Semua' ||
+            _searchTerm.toLowerCase(),
+          );
+      final matchCat = _activeCategory == 'Semua' ||
           (item['category']?['name'] ?? 'Umum') == _activeCategory;
       return matchSearch && matchCat;
     }).toList();

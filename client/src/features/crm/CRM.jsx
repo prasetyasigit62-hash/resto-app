@@ -24,7 +24,7 @@ const CRM = () => {
   }, []);
 
   const handleBroadcast = (customer) => {
-    const text = `Halo *${customer.name}*! 👋\n\nTerima kasih telah menjadi pelanggan setia *Superapp Resto*. Kami punya penawaran spesial khusus untuk Anda!\n\nGunakan kode voucher: *SUPERSETIA20* untuk mendapatkan diskon 20% di kunjungan berikutnya.\n\nDitunggu kedatangannya ya! ✨`;
+    const text = `Halo *${customer.name}*! 👋\n\nTerima kasih telah menjadi pelanggan setia *Resto-app*. Kami punya penawaran spesial khusus untuk Anda!\n\nGunakan kode voucher: *SUPERSETIA20* untuk mendapatkan diskon 20% di kunjungan berikutnya.\n\nDitunggu kedatangannya ya! ✨`;
     // Konversi format nomor
     let phone = customer.phone;
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);

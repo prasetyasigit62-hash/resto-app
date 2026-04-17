@@ -773,8 +773,8 @@ const ConsumerView = ({ data, user, onBackToAdmin, onLogout, isolatedModule }) =
         backgroundColor: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: '15px 20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid rgba(255,255,255,0.3)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => { setPage('shop'); setActiveFnbTenant(null); }}>
-          <div style={{ width: '38px', height: '38px', background: (isolatedModule === 'Ecommerce' || isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? 'white' : 'linear-gradient(135deg, #e74c3c, #c0392b)', color: isolatedModule === 'Ecommerce' ? '#4f46e5' : ((isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? '#e11d48' : 'white'), borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.4rem' }}>{isolatedModule === 'Ecommerce' ? '🛍️' : ((isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? '🍔' : 'S')}</div>
-          <h2 style={{ margin: 0, fontSize: '1.6rem', color: (isolatedModule === 'Ecommerce' || isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? 'white' : '#2c3e50', fontWeight: '900', letterSpacing: '0.5px', textShadow: (isolatedModule === 'Ecommerce' || isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? '0 1px 2px rgba(0,0,0,0.1)' : 'none' }}>{isolatedModule === 'Ecommerce' ? 'SuperMarket' : ((isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? 'Food Court' : 'Superapp')}</h2>
+          <div style={{ width: '38px', height: '38px', background: (isolatedModule === 'Ecommerce' || isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? 'white' : 'linear-gradient(135deg, #e74c3c, #c0392b)', color: isolatedModule === 'Ecommerce' ? '#4f46e5' : ((isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? '#e11d48' : 'white'), borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.4rem' }}>{isolatedModule === 'Ecommerce' ? '🛍️' : ((isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? '🍔' : 'R')}</div>
+          <h2 style={{ margin: 0, fontSize: '1.6rem', color: (isolatedModule === 'Ecommerce' || isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? 'white' : '#2c3e50', fontWeight: '900', letterSpacing: '0.5px', textShadow: (isolatedModule === 'Ecommerce' || isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? '0 1px 2px rgba(0,0,0,0.1)' : 'none' }}>{isolatedModule === 'Ecommerce' ? 'SuperMarket' : ((isolatedModule === 'Restoran' || isolatedModule === 'MallFood') ? 'Food Court' : 'Resto-app')}</h2>
         </div>
 
         {/* SEARCH BAR BARU */}
@@ -811,7 +811,7 @@ const ConsumerView = ({ data, user, onBackToAdmin, onLogout, isolatedModule }) =
                 <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', textAlign: 'center' }}>
                   <img src={user?.image || 'https://via.placeholder.com/50'} alt="user" style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', marginBottom: '10px' }} />
                   <div style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '1.1rem' }}>{user?.username}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{user?.email || 'customer@superapp.com'}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{user?.email || 'customer@resto-app.com'}</div>
                 </div>
                 <button onClick={() => { setPage('shop'); setShowProfileMenu(false); }} style={{ width: '100%', padding: '15px 20px', textAlign: 'left', background: 'white', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.95rem', color: '#334155', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = 'white'}>
                   <span>🏠</span> Beranda Utama
@@ -1249,8 +1249,8 @@ const ConsumerView = ({ data, user, onBackToAdmin, onLogout, isolatedModule }) =
       <footer style={{ background: '#1e293b', color: '#94a3b8', padding: '60px 5% 40px', marginTop: '60px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '40px', marginBottom: '40px' }}>
           <div>
-            <h2 style={{ color: 'white', margin: '0 0 15px', fontSize: '1.5rem', fontWeight: '800' }}>Superapp</h2>
-            <p style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>Ekosistem aplikasi terintegrasi untuk penuhi segala kebutuhan gaya hidup, belanja, dan hunian Anda dalam satu genggaman.</p>
+            <h2 style={{ color: 'white', margin: '0 0 15px', fontSize: '1.5rem', fontWeight: '800' }}>Resto-app</h2>
+            <p style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>Aplikasi terintegrasi untuk penuhi segala kebutuhan pesanan dan reservasi restoran Anda dalam satu genggaman.</p>
           </div>
           <div>
             <h3 style={{ color: 'white', margin: '0 0 15px', fontSize: '1.1rem' }}>Layanan Utama</h3>
@@ -1272,7 +1272,7 @@ const ConsumerView = ({ data, user, onBackToAdmin, onLogout, isolatedModule }) =
           </div>
         </div>
         <div style={{ maxWidth: '1200px', margin: '0 auto', borderTop: '1px solid #334155', paddingTop: '20px', textAlign: 'center', fontSize: '0.85rem' }}>
-          &copy; {new Date().getFullYear()} Superapp Ecosystem. Hak Cipta Dilindungi Undang-Undang.
+          &copy; {new Date().getFullYear()} Resto-app. Hak Cipta Dilindungi Undang-Undang.
         </div>
       </footer>
 

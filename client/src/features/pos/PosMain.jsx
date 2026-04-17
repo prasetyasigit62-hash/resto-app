@@ -7,12 +7,24 @@ import { usePos } from './usePos';
 const PosMain = (props) => {
   const pos = usePos(props);
   const {
-    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, showNoteModal, setShowNoteModal, noteItem, setNoteItem, noteInput, setNoteInput, saveNote, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
+    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, showNoteModal, setShowNoteModal, noteItem, setNoteItem, noteInput, setNoteInput, saveNote, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handleCompleteOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
   } = pos;
 
   // ✨ Local State untuk Input Manual Tag Varian
   const [manualTag, setManualTag] = React.useState('');
   const currentTags = noteInput ? noteInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  // ✨ STATE: Animasi Expand/Collapse 8 Fitur Atas
+  const [isActionsExpanded, setIsActionsExpanded] = React.useState(true);
+
+  React.useEffect(() => {
+      // Otomatis sembunyikan (naik ke atas) jika ada pesanan masuk keranjang
+      if (activeCart.length > 0) {
+          setIsActionsExpanded(false);
+      } else {
+          setIsActionsExpanded(true);
+      }
+  }, [activeCart.length]);
 
   // ✨ MODAL ADD TO CART (POPUP PEMILIHAN & REVIEW MENU)
   const [showAddToCartModal, setShowAddToCartModal] = React.useState(false);
@@ -244,43 +256,101 @@ const PosMain = (props) => {
                 </div>
             </div>
             
-            <div style={styles.posCartHeaderActions}>
-                <button onClick={() => setShowTableModal(true)} style={styles.headerActionBtn} title="Ganti Meja">
-                    <span style={{fontSize: '1.2rem'}}>🪑</span> Meja
-                </button>
-                <button onClick={fetchPendingOrders} style={styles.headerActionBtn} title="Pesanan Masuk">
-                    <span style={{fontSize: '1.2rem'}}>📋</span> Order
-                </button>
-                <button onClick={() => setShowCustomerModal(true)} style={{...styles.headerActionBtn, border: selectedCustomer ? '2px solid var(--primary-color)' : '1px solid var(--border-color)', background: selectedCustomer ? '#eff6ff' : 'var(--bg-color)'}} title="Pilih Pelanggan / Member">
-                    <span style={{fontSize: '1.2rem'}}>👥</span> {selectedCustomer ? 'Member' : 'Pelanggan'}
-                </button>
-                <button onClick={() => setShowCashModal(true)} style={styles.headerActionBtn} title="Kelola Kas (Petty Cash)">
-                    <span style={{fontSize: '1.2rem'}}>💸</span> Kas
-                </button>
-                <button onClick={fetchHistoryOrders} style={styles.headerActionBtn} title="Riwayat & Reprint">
-                    <span style={{fontSize: '1.2rem'}}>📜</span> Riwayat
-                </button>
-                <button onClick={() => { setIsSplitMode(!isSplitMode); setSplitSelection({}); }} style={{...styles.headerActionBtn, background: isSplitMode ? 'var(--warning-color)' : 'var(--bg-color)', color: isSplitMode ? 'white' : 'var(--text-color)'}} title="Split Bill (Bayar Sebagian)">
-                    <span style={{fontSize: '1.2rem'}}>✂️</span> Split
-                </button>
-                <div style={styles.heldCartsContainer} onMouseEnter={() => setShowHeldCarts(true)} onMouseLeave={() => setShowHeldCarts(false)}>
-                    <button style={styles.headerActionBtn}>
-                        <span style={{fontSize: '1.2rem'}}>✋</span> Tahan <span style={{fontSize:'0.7rem', background:'var(--primary-color)', color:'white', borderRadius:'10px', padding:'0 5px', position:'absolute', top:'5px', right:'5px'}}>{heldCarts.length || ''}</span>
+            {/* ✨ FIX: Container 8 Fitur dengan Transisi Smooth (Naik/Turun) */}
+            <div style={{ 
+                overflow: isActionsExpanded ? 'visible' : 'hidden', 
+                transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin-bottom 0.3s ease', 
+                maxHeight: isActionsExpanded ? '400px' : '0px',
+                opacity: isActionsExpanded ? 1 : 0,
+                marginBottom: isActionsExpanded ? '10px' : '0px'
+            }}>
+                <div style={styles.posCartHeaderActions}>
+                    <button onClick={() => setShowTableModal(true)} style={styles.headerActionBtn} title="Ganti Meja">
+                        <span style={{fontSize: '1.2rem'}}>🪑</span> Meja
                     </button>
-                    {showHeldCarts && heldCarts.length > 0 && (
-                        <div style={styles.heldCartsDropdown}>
-                        {heldCarts.map((cart, index) => (
-                            <div key={cart.id} onClick={() => resumeCart(cart.id)} style={{ ...styles.heldCartsDropdownItem, borderBottom: index === heldCarts.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                            Transaksi #{cart.id} ({cart.items.length} item)
+                    <button onClick={fetchPendingOrders} style={styles.headerActionBtn} title="Pesanan Masuk">
+                        <span style={{fontSize: '1.2rem'}}>📋</span> Order
+                    </button>
+                    <button onClick={() => setShowCustomerModal(true)} style={{...styles.headerActionBtn, border: selectedCustomer ? '2px solid var(--primary-color)' : '1px solid var(--border-color)', background: selectedCustomer ? '#eff6ff' : 'var(--bg-color)'}} title="Pilih Pelanggan / Member">
+                        <span style={{fontSize: '1.2rem'}}>👥</span> {selectedCustomer ? 'Member' : 'Pelanggan'}
+                    </button>
+                    <button onClick={() => setShowCashModal(true)} style={styles.headerActionBtn} title="Kelola Kas (Petty Cash)">
+                        <span style={{fontSize: '1.2rem'}}>💸</span> Kas
+                    </button>
+                    <button onClick={fetchHistoryOrders} style={styles.headerActionBtn} title="Riwayat & Reprint">
+                        <span style={{fontSize: '1.2rem'}}>📜</span> Riwayat
+                    </button>
+                    <button onClick={() => { setIsSplitMode(!isSplitMode); setSplitSelection({}); }} style={{...styles.headerActionBtn, background: isSplitMode ? 'var(--warning-color)' : 'var(--bg-color)', color: isSplitMode ? 'white' : 'var(--text-color)'}} title="Split Bill (Bayar Sebagian)">
+                        <span style={{fontSize: '1.2rem'}}>✂️</span> Split
+                    </button>
+                    <div style={{ position: 'relative' }} onMouseEnter={() => setShowHeldCarts(true)} onMouseLeave={() => setShowHeldCarts(false)}>
+                        <button 
+                            onClick={() => {
+                                if (activeCart.length > 0) holdCart();
+                                else setShowHeldCarts(!showHeldCarts);
+                            }}
+                            style={styles.headerActionBtn}
+                        >
+                            <span style={{fontSize: '1.2rem'}}>✋</span> Tahan <span style={{fontSize:'0.7rem', background:'var(--primary-color)', color:'white', borderRadius:'10px', padding:'0 5px', position:'absolute', top:'5px', right:'5px'}}>{heldCarts.length || ''}</span>
+                        </button>
+                        {showHeldCarts && heldCarts.length > 0 && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: '0',
+                                background: 'white',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                zIndex: 100,
+                                minWidth: '200px',
+                                overflow: 'hidden'
+                            }}>
+                            {heldCarts.map((cart, index) => (
+                                <div 
+                                    key={cart.id} 
+                                    onClick={() => { resumeCart(cart.id); setShowHeldCarts(false); }} 
+                                    style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: index === heldCarts.length - 1 ? 'none' : '1px solid var(--border-color)', fontSize: '0.85rem', color: '#1e293b', fontWeight: '500' }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'white'}
+                                >
+                                ⏳ <strong>{cart.table?.name || cart.customer?.name || 'Takeaway'}</strong> <span style={{color: '#64748b'}}>({cart.items.length} item)</span>
+                                </div>
+                            ))}
                             </div>
-                        ))}
-                        </div>
-                    )}
+                        )}
+                    </div>
+                    <button onClick={() => setShowShiftEndModal(true)} style={{...styles.headerActionBtn, color: 'var(--danger-color)', borderColor: 'var(--danger-color)', background: '#fff1f2'}} title="Tutup Shift">
+                        <span style={{fontSize: '1.2rem'}}>🔒</span> Shift
+                    </button>
                 </div>
-                <button onClick={() => setShowShiftEndModal(true)} style={{...styles.headerActionBtn, color: 'var(--danger-color)', borderColor: 'var(--danger-color)', background: '#fff1f2'}} title="Tutup Shift">
-                    <span style={{fontSize: '1.2rem'}}>🔒</span> Shift
-                </button>
             </div>
+
+            {/* ✨ TOMBOL TOGGLE "OPSI LAINNYA" (Menempel di bawah layout fitur) */}
+            {activeCart.length > 0 && (
+                <button 
+                    onClick={() => setIsActionsExpanded(!isActionsExpanded)}
+                    style={{
+                        width: '100%',
+                        padding: '8px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        color: 'var(--primary-color)',
+                        fontWeight: 'bold',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '5px',
+                        marginBottom: '10px',
+                        transition: 'background 0.2s'
+                    }}
+                >
+                    {isActionsExpanded ? '▲ Sembunyikan Opsi' : '▼ Tampilkan Opsi Lainnya'}
+                </button>
+            )}
           </div>
           <div style={styles.posCartList}>
             {activeCart.length === 0 ? (
@@ -334,139 +404,188 @@ const PosMain = (props) => {
             )}
           </div>
           <div style={styles.posCartSummary}>
-            <div style={styles.posSummaryRow}>
-              <span>Subtotal</span>
-              <span>Rp {cartTotals.subtotal.toLocaleString('id-ID')}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '0 5px' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#64748b' }}>Total Akhir</span>
+                <span style={{ fontSize: '1.4rem', fontWeight: '900', color: 'var(--primary-color)' }}>Rp {cartTotals.total.toLocaleString('id-ID')}</span>
             </div>
-
-            {selectedCustomer && (
-                <div style={{...styles.posSummaryRow, color: 'var(--primary-color)', fontWeight:'bold', flexDirection:'column', alignItems:'flex-start', gap:'5px', background:'#eff6ff', padding:'10px', borderRadius:'8px', border:'1px solid #bfdbfe'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}>
-                        <span>👤 {selectedCustomer.name} (Poin: {selectedCustomer.points})</span>
-                        <button onClick={() => { setSelectedCustomer(null); setUsePoints(0); }} style={{background:'none', border:'none', cursor:'pointer', color:'#999', fontSize:'0.8rem'}}>❌</button>
-                    </div>
-                    {/* ✨ INPUT TUKAR POIN */}
-                    {selectedCustomer.points > 0 && (
-                        <div style={{display:'flex', width:'100%', gap:'8px', marginTop:'5px'}}>
-                            <input type="number" max={selectedCustomer.points} value={usePoints || ''} onChange={e => setUsePoints(Math.min(e.target.value, selectedCustomer.points))} style={{...styles.discountInput, flex:1, padding:'6px 10px', textAlign:'left', borderRadius:'6px'}} placeholder="Tukar Poin..."/>
-                            <button onClick={() => setUsePoints(selectedCustomer.points)} style={{background:'var(--primary-color)', color:'white', border:'none', borderRadius:'6px', padding:'0 12px', fontSize:'0.8rem', cursor:'pointer'}}>Max</button>
-                        </div>
-                    )}
+            
+            {!isSplitMode && (
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                    <button onClick={holdCart} style={{ flex: 1, padding: '10px', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>✋ Tahan</button>
+                    <button onClick={() => setActiveCart([])} style={{ flex: 1, padding: '10px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>🗑️ Batal</button>
                 </div>
             )}
             
-            {/* ✨ NEW: Voucher & Discount Section (Disembunyikan saat mode split) */}
-            {!isSplitMode && (
-              <div style={{marginBottom: '15px', padding: '12px', background: 'var(--bg-color)', borderRadius: '12px'}}>
-                  <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>
-                      <input 
-                          type="text" 
-                          placeholder="Kode Voucher (Cth: OPENING50)" 
-                          value={voucherCode}
-                          onChange={e => setVoucherCode(e.target.value.toUpperCase())}
-                          style={{flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', textTransform: 'uppercase', outline: 'none'}}
-                      />
-                      <button onClick={handleApplyVoucher} style={{background: 'var(--text-color)', color: 'white', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600'}}>Pakai</button>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
-                      <span style={{fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '500'}}>Diskon Manual:</span>
-                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'white', overflow: 'hidden' }}>
-                          <input type="number" value={discountInput} onChange={e => setDiscountInput(e.target.value)} onBlur={applyDiscount} style={{...styles.discountInput, width: '90px', border: 'none', borderRadius: 0}} placeholder="0" />
-                          <button onClick={() => {setDiscount({ type: 'percent', value: 0 }); setAppliedVoucher(null);}} style={{ ...styles.discountTypeBtn, padding: '4px 8px', fontSize: '0.8rem', background: discount.type === 'percent' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'percent' ? 'white' : 'var(--text-color)' }}>%</button>
-                          <button onClick={() => {setDiscount({ type: 'nominal', value: 0 }); setAppliedVoucher(null);}} style={{ ...styles.discountTypeBtn, padding: '4px 8px', fontSize: '0.8rem', background: discount.type === 'nominal' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'nominal' ? 'white' : 'var(--text-color)' }}>Rp</button>
-                      </div>
-                  </div>
-              </div>
-            )}
-
-            {cartTotals.discountAmount > 0 && (
-              <div style={{ ...styles.posSummaryRow, color: 'var(--success-color)' }}>
-                <span>Diskon {appliedVoucher ? `(${appliedVoucher.code})` : ''}</span>
-                <span>- Rp {cartTotals.discountAmount.toLocaleString('id-ID')}</span>
-              </div>
-            )}
-
-            {cartTotals.memberDiscount > 0 && (
-              <div style={{ ...styles.posSummaryRow, color: 'var(--success-color)' }}>
-                <span>Diskon Member (10%)</span>
-                <span>- Rp {cartTotals.memberDiscount.toLocaleString('id-ID')}</span>
-              </div>
-            )}
-
-            {cartTotals.serviceCharge > 0 && (
-              <div style={{ ...styles.posSummaryRow, color: '#64748b' }}>
-                <span>Service ({storeSettings.serviceChargePercentage}%)</span>
-                <span>Rp {Math.round(cartTotals.serviceCharge).toLocaleString('id-ID')}</span>
-              </div>
-            )}
-
-            {cartTotals.pointsDiscount > 0 && (
-              <div style={{ ...styles.posSummaryRow, color: '#16a34a' }}>
-                <span>Tukar Poin</span>
-                <span>- Rp {cartTotals.pointsDiscount.toLocaleString('id-ID')}</span>
-              </div>
-            )}
-
-            <div style={{ ...styles.posSummaryRow, ...styles.posSummaryRowTax }}><span>Pajak ({storeSettings.taxPercentage}%)</span><span>Rp {Math.round(cartTotals.tax).toLocaleString('id-ID')}</span></div>
-            <div style={{ ...styles.posSummaryRow, ...styles.posSummaryRowTotal }}><span>Total</span><span>Rp {cartTotals.total.toLocaleString('id-ID')}</span></div>
-            
-            {!isSplitMode && (
-              <div style={styles.posCartButtons}>
-                <button onClick={holdCart} style={{ ...styles.posBtn, ...styles.posBtnHold }}>Tahan</button>
-                <button onClick={() => setActiveCart([])} style={{ ...styles.posBtn, ...styles.posBtnCancel }}>Batal</button>
-              </div>
-            )}
-            
-            <div style={{display:'flex', gap:'10px', marginTop: isSplitMode ? '10px' : '0'}}>
-                {!isSplitMode && (
-                    <button 
-                        onClick={() => {
-                            if (activeCart.length === 0) return toast.warn("Keranjang masih kosong!");
-                            if (!activeShift) return toast.error("Silakan buka Shift Kasir terlebih dahulu!");
-                            handleSendToKitchen();
-                        }}
-                        style={{ ...styles.posBtn, ...styles.posBtnPay, background: '#3b82f6' }}
-                    >
-                        👨‍🍳 Kirim Dapur
-                    </button>
-                )}
-                <button
+            <button
                 onClick={() => {
                     if (activeCart.length === 0) return toast.warn("Keranjang masih kosong!");
                     if (!activeShift) return toast.error("Silakan buka Shift Kasir terlebih dahulu!");
                     setShowPaymentModal(true);
                 }}
-                style={{ ...styles.posBtn, ...styles.posBtnPay }}
-                >
-                {isSplitMode ? 'Bayar Sebagian' : '💰 Bayar'}
-                </button>
-            </div>
+                style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, var(--primary-color) 0%, #4338ca 100%)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)', transition: 'transform 0.2s' }}
+                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={e => e.currentTarget.style.transform = 'none'}
+            >
+                {isSplitMode ? 'Bayar Sebagian' : 'Selesaikan Pesanan 🚀'}
+            </button>
           </div>
         </div>
       </div>
 
         {/* Payment Modal */}
         {showPaymentModal && (
-          <div className="modal-overlay" style={{ zIndex: 2500 }}>
-            <div className="modal-content" style={{ maxWidth: '400px' }}>
+          <div className="modal-overlay" style={{ zIndex: 3500 }}>
+            <div className="modal-content" style={{ maxWidth: '850px', width: '95%' }}>
               <div className="modal-header">
-                <h3>Pembayaran {orderToPay ? `(${orderToPay.customerName})` : ''}</h3>
+                <h3>{orderToPay ? `Pembayaran (${orderToPay.customerName})` : 'Review & Selesaikan Pesanan'}</h3>
                 <button onClick={() => { setShowPaymentModal(false); setOrderToPay(null); }} className="modal-close">&times;</button>
               </div>
-              <div className="modal-body">
-                <p style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>Rp {(orderToPay ? orderToPay.total : cartTotals.total).toLocaleString('id-ID')}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '20px' }}>
-                  {['Tunai', 'Kartu', 'QRIS', 'Lainnya'].map(method => (
-                  <button key={method} style={styles.paymentMethod} onClick={() => {
-                      if (method === 'QRIS') handleQrisPayment();
-                      else if (orderToPay) confirmPayPendingOrder(method);
-                      else finalizeOrder(method);
-                  }}>
-                      <span style={{ fontSize: '2rem' }}>{method === 'Tunai' ? '💵' : method === 'Kartu' ? '💳' : method === 'QRIS' ? '📱' : '🧾'}</span>
-                      <span>{method}</span>
-                    </button>
-                  ))}
+              <div className="modal-body" style={{ padding: '20px', maxHeight: '85vh', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                
+                {/* ✨ KOLOM KIRI: Review Pesanan & Total Tagihan */}
+                <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>📝</span> Rincian Pesanan
+                    </h4>
+                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px', marginBottom: '15px', minHeight: '150px' }}>
+                        {(orderToPay ? orderToPay.items : (isSplitMode ? activeCart.map(item => ({...item, qty: splitSelection[item.id] || 0})).filter(item => item.qty > 0) : activeCart)).map((item, idx) => {
+                            const priceNum = parseInt(String(item.price).replace(/\D/g, '')) || 0;
+                            return (
+                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px dashed #cbd5e1' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontWeight: '600', color: '#334155' }}>{item.qty}x {item.name}</span>
+                                        {item.note && <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Catatan: {item.note}</span>}
+                                    </div>
+                                    <span style={{ fontWeight: 'bold', color: '#0f172a' }}>Rp {(item.qty * priceNum).toLocaleString('id-ID')}</span>
+                                </div>
+                            );
+                        })}
+                        {(orderToPay ? orderToPay.items : activeCart).length === 0 && (
+                            <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada item untuk direview.</div>
+                        )}
+                    </div>
+                    
+                    {/* Rincian Total Tagihan */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '15px', borderTop: '2px dashed #cbd5e1' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.9rem' }}>
+                            <span>Subtotal</span><span>Rp {cartTotals.subtotal.toLocaleString('id-ID')}</span>
+                        </div>
+                        {cartTotals.discountAmount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontSize: '0.9rem' }}><span>Diskon {appliedVoucher ? `(${appliedVoucher.code})` : ''}</span><span>- Rp {cartTotals.discountAmount.toLocaleString('id-ID')}</span></div>}
+                        {cartTotals.memberDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontSize: '0.9rem' }}><span>Diskon Member</span><span>- Rp {cartTotals.memberDiscount.toLocaleString('id-ID')}</span></div>}
+                        {cartTotals.pointsDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontSize: '0.9rem' }}><span>Tukar Poin</span><span>- Rp {cartTotals.pointsDiscount.toLocaleString('id-ID')}</span></div>}
+                        {cartTotals.serviceCharge > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.9rem' }}><span>Service ({storeSettings.serviceChargePercentage}%)</span><span>Rp {Math.round(cartTotals.serviceCharge).toLocaleString('id-ID')}</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.9rem' }}><span>Pajak ({storeSettings.taxPercentage}%)</span><span>Rp {Math.round(cartTotals.tax).toLocaleString('id-ID')}</span></div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '1.3rem', color: 'var(--primary-color)', paddingTop: '12px', borderTop: '2px solid #cbd5e1', marginTop: '8px' }}>
+                        <span>Total Akhir:</span>
+                        <span>Rp {cartTotals.total.toLocaleString('id-ID')}</span>
+                    </div>
                 </div>
+
+                {/* ✨ KOLOM KANAN: Diskon, Open Bill & Metode Pembayaran */}
+                <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {!isSplitMode && (
+                        <>
+                            {/* Member Poin */}
+                            {selectedCustomer && (
+                                <div style={{ color: 'var(--primary-color)', fontWeight:'bold', display:'flex', flexDirection:'column', gap:'5px', background:'#eff6ff', padding:'10px 15px', borderRadius:'12px', border:'1px solid #bfdbfe' }}>
+                                    <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}>
+                                        <span>👤 {selectedCustomer.name} (Poin: {selectedCustomer.points})</span>
+                                        <button onClick={() => { setSelectedCustomer(null); setUsePoints(0); }} style={{background:'none', border:'none', cursor:'pointer', color:'#999', fontSize:'0.8rem'}}>❌</button>
+                                    </div>
+                                    {selectedCustomer.points > 0 && (
+                                        <div style={{display:'flex', width:'100%', gap:'8px', marginTop:'5px'}}>
+                                            <input type="text" value={usePoints ? String(usePoints).replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ''} onChange={e => { const val = Number(e.target.value.replace(/\D/g, '')); setUsePoints(Math.min(val, selectedCustomer.points)); }} style={{...styles.discountInput, flex:1, padding:'6px 10px', textAlign:'left', borderRadius:'6px', border: '1px solid #bfdbfe'}} placeholder="Tukar Poin..."/>
+                                            <button onClick={() => setUsePoints(selectedCustomer.points)} style={{background:'var(--primary-color)', color:'white', border:'none', borderRadius:'6px', padding:'0 12px', fontSize:'0.8rem', cursor:'pointer'}}>Max</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Promo & Diskon */}
+                            <div style={{ padding: '12px 15px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: '#1e293b' }}>🎟️ Promo & Diskon</h4>
+                                <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>
+                                    <div style={{ flex: 1, minWidth: 0, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Kode Promo (Ketik/Pilih ⬇)" 
+                                            list="voucher-list"
+                                            value={voucherCode}
+                                            onChange={e => setVoucherCode(e.target.value.toUpperCase())}
+                                            style={{width: '100%', boxSizing: 'border-box', padding: '8px', paddingRight: voucherCode ? '30px' : '8px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', textTransform: 'uppercase', outline: 'none'}}
+                                        />
+                                        {voucherCode && (
+                                            <button 
+                                                onClick={() => {
+                                                    setVoucherCode('');
+                                                    setAppliedVoucher(null);
+                                                    setDiscount({ type: 'percent', value: 0 });
+                                                    setDiscountInput('');
+                                                }}
+                                                style={{ position: 'absolute', right: '8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', padding: 0, lineHeight: 1 }}
+                                                title="Hapus Promo"
+                                            >&times;</button>
+                                        )}
+                                    </div>
+                                    <datalist id="voucher-list">
+                                        {vouchers.filter(v => v.isActive !== false && v.is_active !== false && v.quota !== 0 && (!v.expiryDate || new Date(v.expiryDate) >= new Date(new Date().setHours(0,0,0,0)))).map(v => (
+                                            <option key={v.id} value={v.code}>{v.name} ({v.type === 'percent' ? v.value + '%' : 'Rp ' + Number(v.value).toLocaleString('id-ID')})</option>
+                                        ))}
+                                    </datalist>
+                                    <button onClick={handleApplyVoucher} style={{background: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', padding: '0 15px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600'}}>Pakai</button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
+                                    <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: '500'}}>Diskon Manual:</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'white', overflow: 'hidden' }}>
+                                        <input type="text" value={discount.type === 'nominal' && discountInput ? String(discountInput).replace(/\B(?=(\d{3})+(?!\d))/g, ".") : discountInput} onChange={e => { let val = e.target.value; if (discount.type === 'nominal') val = val.replace(/\D/g, ''); setDiscountInput(val); }} onBlur={applyDiscount} style={{...styles.discountInput, width: '100px', border: 'none', borderRadius: 0, padding: '6px 10px'}} placeholder="0" />
+                                        <button onClick={() => {setDiscount({ type: 'percent', value: 0 }); setAppliedVoucher(null); setDiscountInput('');}} style={{ padding: '6px 10px', fontSize: '0.8rem', border: 'none', background: discount.type === 'percent' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'percent' ? 'white' : '#1e293b', cursor: 'pointer' }}>%</button>
+                                        <button onClick={() => {setDiscount({ type: 'nominal', value: 0 }); setAppliedVoucher(null); setDiscountInput('');}} style={{ padding: '6px 10px', fontSize: '0.8rem', border: 'none', background: discount.type === 'nominal' ? 'var(--primary-color)' : 'transparent', color: discount.type === 'nominal' ? 'white' : '#1e293b', cursor: 'pointer' }}>Rp</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tombol Kirim Dapur (Bayar Nanti) */}
+                            {!orderToPay && (
+                                <button 
+                                    onClick={() => { 
+                                        handleSendToKitchen(); 
+                                        setShowPaymentModal(false); 
+                                    }} 
+                                    style={{ width: '100%', padding: '12px', background: '#fffbeb', color: '#b45309', border: '2px solid #fde68a', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.05rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#fef3c7'}
+                                    onMouseOut={e => e.currentTarget.style.background = '#fffbeb'}
+                                >
+                                    👨‍🍳 Pesan & Bayar Nanti (Open Bill)
+                                </button>
+                            )}
+                        </>
+                    )}
+
+                    {/* Pilihan Pembayaran */}
+                    <div style={{ background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0', flex: 1 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: '#1e293b', textAlign: 'center' }}>
+                            {(!orderToPay && !isSplitMode) ? 'Atau Bayar Sekarang' : 'Pilih Metode Pembayaran'}
+                        </h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          {['Tunai', 'Kartu', 'QRIS', 'Lainnya'].map(method => (
+                          <button key={method} style={{...styles.paymentMethod, padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)', background: '#f8fafc', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'}} 
+                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(79,70,229,0.15)'; e.currentTarget.style.background = 'white'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; e.currentTarget.style.background = '#f8fafc'; }}
+                            onClick={() => {
+                              if (method === 'QRIS') handleQrisPayment();
+                              else if (orderToPay) confirmPayPendingOrder(method);
+                              else finalizeOrder(method);
+                          }}>
+                              <span style={{ fontSize: '1.6rem' }}>{method === 'Tunai' ? '💵' : method === 'Kartu' ? '💳' : method === 'QRIS' ? '📱' : '🧾'}</span>
+                              <span style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '0.9rem' }}>{method}</span>
+                            </button>
+                          ))}
+                        </div>
+                    </div>
+                </div>
+
               </div>
             </div>
           </div>
@@ -485,7 +604,7 @@ const PosMain = (props) => {
               </div>
               
               <div style={{fontSize: '2.5rem', fontWeight: '900', color: '#1e293b', marginBottom: '20px'}}>
-                Rp {(orderToPay ? orderToPay.total : cartTotals.total).toLocaleString('id-ID')}
+                Rp {cartTotals.total.toLocaleString('id-ID')}
               </div>
 
               {qrisStatus === 'waiting' ? (
@@ -523,7 +642,7 @@ const PosMain = (props) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <input type="checkbox" checked={selectedOrders.includes(order.id)} onChange={() => handleSelectOrder(order.id)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-                            <strong>{order.customerName} (#{order.id})</strong>
+                            <strong>{order.customerName} ({order.trackingNumber || `#${String(order.id).slice(0,8)}`})</strong>
                           </div>
                           <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>Rp {(order.total || 0).toLocaleString('id-ID')}</span>
                         </div>
@@ -534,20 +653,28 @@ const PosMain = (props) => {
                           {order.items.map(i => `${i.name} x${i.qty}`).join(', ')}
                         </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
-                        {order.status === 'Need_Confirmation' ? (
+                        {order.status === 'Need_Confirmation' || order.status === 'Pending' ? (
                             <button onClick={() => handleConfirmOrder(order)} style={{ ...styles.posBtnPay, marginTop: 0, padding: '8px', fontSize: '0.9rem', flex: 1, background: '#3b82f6' }}>👨‍🍳 Konfirmasi & Kirim Dapur</button>
                         ) : (
                           <>
                         <button onClick={() => handlePrintChecker({
-                            table: order.customerName, // Usually holds table name for pending orders
+                            table: order.customerName,
                             items: order.items,
-                            orderId: order.id
+                            orderId: order.trackingNumber || order.id
                         })} style={{ ...styles.posBtnSecondary, marginTop: 0, padding: '8px', fontSize: '0.9rem', flex: 1 }} title="Cetak Checker Dapur">
                           🖨️ Dapur
                         </button>
-                        <button onClick={() => handlePayPendingOrderClick(order)} style={{ ...styles.posBtnPay, marginTop: 0, padding: '8px', fontSize: '0.9rem', flex: 2 }}>
-                          💰 Bayar
+                        
+                        {/* ✨ Kasir bisa membedakan mana yang BELUM bayar dan yang SUDAH bayar */}
+                        {order.paymentMethod === 'Open Bill' ? (
+                            <button onClick={() => handlePayPendingOrderClick(order)} style={{ ...styles.posBtnPay, marginTop: 0, padding: '8px', fontSize: '0.9rem', flex: 2 }}>
+                              💰 Bayar
+                            </button>
+                        ) : (
+                            <button onClick={() => handleCompleteOrder(order.id)} style={{ ...styles.posBtnPay, marginTop: 0, padding: '8px', fontSize: '0.9rem', flex: 2, background: 'var(--success-color)' }}>
+                              ✅ Selesaikan
                           </button>
+                        )}
                           </>
                         )}
                           {/* Tombol Gabung/Pindah hanya muncul jika ada order lain yang dipilih */}
@@ -660,7 +787,7 @@ const PosMain = (props) => {
                             {historyOrders.map(order => (
                                 <tr key={order.id} style={{borderBottom:'1px solid #f1f5f9'}}>
                                     <td style={{padding:'12px'}}>
-                                        <strong>#{order.id}</strong><br/>
+                                        <strong>{order.trackingNumber || `#${String(order.id).slice(0,8)}`}</strong><br/>
                                         <span style={{fontSize:'0.8rem', color:'#64748b'}}>{new Date(order.date).toLocaleTimeString('id-ID')}</span>
                                     </td>
                                     <td style={{padding:'12px', fontWeight:'bold'}}>Rp {order.total.toLocaleString('id-ID')}</td>

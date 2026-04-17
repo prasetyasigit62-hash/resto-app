@@ -27,7 +27,7 @@ const Help = () => {
   return (
     <div className="service-view">
       <h2>Pusat Bantuan</h2>
-      <p>Panduan dan pertanyaan umum seputar penggunaan Superapp.</p>
+      <p>Panduan dan pertanyaan umum seputar penggunaan Resto-app.</p>
 
       <div style={{ marginTop: '30px', maxWidth: '800px' }}>
         {faqs.map((item, index) => (
@@ -43,7 +43,7 @@ const Help = () => {
           <h3>Butuh bantuan lebih lanjut?</h3>
           <p>Silakan hubungi tim IT Support kami:</p>
           <ul style={{ marginTop: '10px', paddingLeft: '20px' }}>
-            <li>Email: support@superapp.com</li>
+            <li>Email: support@resto-app.com</li>
             <li>WhatsApp: +62 812 3456 7890</li>
             <li>Jam Operasional: Senin - Jumat (09:00 - 17:00)</li>
           </ul>

@@ -1,53 +1,80 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
-class MenuManagementScreen extends StatelessWidget {
+class MenuManagementScreen extends StatefulWidget {
   const MenuManagementScreen({super.key});
 
   @override
+  State<MenuManagementScreen> createState() => _MenuManagementScreenState();
+}
+
+class _MenuManagementScreenState extends State<MenuManagementScreen> {
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _menus = [];
+
+  // Mock data daftar menu
+  final List<Map<String, dynamic>> menuItems = [
+    {
+      'name': 'Nasi Goreng Seafood',
+      'price': 35000,
+      'category': {'name': 'Makanan'},
+      'isActive': true,
+      'image': null,
+    },
+    {
+      'name': 'Mie Goreng Spesial',
+      'price': 30000,
+      'category': {'name': 'Makanan'},
+      'isActive': true,
+      'image': null,
+    },
+    {
+      'name': 'Ayam Bakar Taliwang',
+      'price': 40000,
+      'category': {'name': 'Makanan'},
+      'isActive': true,
+      'image': null,
+    },
+    {
+      'name': 'Es Teh Manis',
+      'price': 8000,
+      'category': {'name': 'Minuman'},
+      'isActive': true,
+      'image': null,
+    },
+    {
+      'name': 'Kopi Susu Es',
+      'price': 15000,
+      'category': {'name': 'Minuman'},
+      'isActive': true,
+      'image': null,
+    },
+    {
+      'name': 'Jus Jeruk',
+      'price': 12000,
+      'category': {'name': 'Minuman'},
+      'isActive': false,
+      'image': null,
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Inisialisasi data menu dari mock data
+    _menus = menuItems;
+  }
+
+  void _showAddMenuModal() {
+    // TODO: Implementasi logika untuk menampilkan modal tambah menu
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Fungsi Tambah Menu belum diimplementasikan')),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width >= 800;
-
-    // Mock data daftar menu
-    final List<Map<String, dynamic>> menuItems = [
-      {
-        'name': 'Nasi Goreng Seafood',
-        'price': 35000,
-        'category': 'Makanan',
-        'isActive': true,
-      },
-      {
-        'name': 'Mie Goreng Spesial',
-        'price': 30000,
-        'category': 'Makanan',
-        'isActive': true,
-      },
-      {
-        'name': 'Ayam Bakar Taliwang',
-        'price': 40000,
-        'category': 'Makanan',
-        'isActive': true,
-      },
-      {
-        'name': 'Es Teh Manis',
-        'price': 8000,
-        'category': 'Minuman',
-        'isActive': true,
-      },
-      {
-        'name': 'Kopi Susu Es',
-        'price': 15000,
-        'category': 'Minuman',
-        'isActive': true,
-      },
-      {
-        'name': 'Jus Jeruk',
-        'price': 12000,
-        'category': 'Minuman',
-        'isActive': false,
-      },
-    ];
-
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -134,8 +161,8 @@ class MenuManagementScreen extends StatelessWidget {
                                     ? ClipRRect(
                                         borderRadius:
                                             const BorderRadius.vertical(
-                                              top: Radius.circular(16),
-                                            ),
+                                          top: Radius.circular(16),
+                                        ),
                                         child: Image.network(
                                           item['image'],
                                           fit: BoxFit.cover,

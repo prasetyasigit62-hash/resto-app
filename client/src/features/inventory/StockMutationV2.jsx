@@ -23,11 +23,19 @@ const StockMutationV2 = ({ user }) => {
   // ✨ Modal Quick Restock (Pembelian Manual Tanpa PO)
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [restockForm, setRestockForm] = useState({ outletId: '', materialId: '', qty: '', cost: '', supplierId: '', note: '' });
+  const [showRestockMatDropdown, setShowRestockMatDropdown] = useState(false);
 
   // ✨ Helper Format Rupiah Otomatis
   const formatRupiah = (value) => {
     if (!value) return '';
     return String(value).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const getMaterialStockInfo = (materialId, outletId) => {
+    const filtered = stocks.filter(s => s.materialId === materialId && (!outletId || s.outletId === outletId));
+    const qty = filtered.reduce((acc, s) => acc + s.qty, 0);
+    const mat = materials.find(m => m.id === materialId);
+    return { qty, unit: mat?.unit || '', isLow: mat ? qty <= mat.minStock : false };
   };
 
   const fetchData = async () => {
@@ -144,6 +152,7 @@ const StockMutationV2 = ({ user }) => {
           <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#1e293b' }}>📦 Stok & Mutasi Outlet</h2>
           <p style={{ color: '#64748b' }}>Pantau pergerakan bahan baku dan lakukan Stock Opname harian.</p>
         </div>
+        {['OWNER', 'ADMIN', 'CHEF', 'SUPERADMIN'].includes(String(user?.role).toUpperCase()) && (
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => { setRestockForm({ outletId: user.outletId || '', materialId: '', qty: '', cost: '', supplierId: '', note: 'Quick Restock Harian' }); setShowRestockModal(true); }} className="profile-save-btn" style={{ width: 'auto', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 4px 6px rgba(59,130,246,0.3)' }}>
                 📥 Quick Restock
@@ -155,6 +164,7 @@ const StockMutationV2 = ({ user }) => {
                 ⚖️ Lakukan Opname
             </button>
         </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)' }}>
@@ -258,7 +268,7 @@ const StockMutationV2 = ({ user }) => {
             </div>
             <form onSubmit={handleOpnameSubmit} style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                {(!user.outletId || user.role === 'OWNER') && (
+                {(!user.outletId || ['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role)) && (
                    <div>
                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Pilih Cabang <span style={{color:'#ef4444'}}>*</span></label>
                      <select required value={opnameForm.outletId} onChange={e => setOpnameForm({...opnameForm, outletId: e.target.value})} style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: 'white', cursor: 'pointer' }}>
@@ -358,7 +368,7 @@ const StockMutationV2 = ({ user }) => {
             </div>
             <form onSubmit={handleWasteSubmit} style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                {(!user.outletId || user.role === 'OWNER') && (
+                {(!user.outletId || ['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role)) && (
                    <div>
                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Pilih Cabang <span style={{color:'#ef4444'}}>*</span></label>
                      <select required value={wasteForm.outletId} onChange={e => setWasteForm({...wasteForm, outletId: e.target.value})} style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: 'white', cursor: 'pointer' }}>
@@ -407,7 +417,7 @@ const StockMutationV2 = ({ user }) => {
             </div>
             <form onSubmit={handleRestockSubmit} style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                {(!user.outletId || user.role === 'OWNER') && (
+                {(!user.outletId || ['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role)) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Pilih Cabang <span style={{color:'#ef4444'}}>*</span></label>
                     <select required value={restockForm.outletId} onChange={e => setRestockForm({...restockForm, outletId: e.target.value})} style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: 'white', cursor: 'pointer' }}>
@@ -416,12 +426,60 @@ const StockMutationV2 = ({ user }) => {
                     </select>
                   </div>
                 )}
-                <div>
+                <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Pilih Bahan Baku <span style={{color:'#ef4444'}}>*</span></label>
-                  <select required value={restockForm.materialId} onChange={e => setRestockForm({...restockForm, materialId: e.target.value})} style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: 'white', cursor: 'pointer' }}>
-                    <option value="">-- Pilih Bahan --</option>
-                    {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
-                  </select>
+                  {/* Trigger */}
+                  <div
+                    onClick={() => setShowRestockMatDropdown(v => !v)}
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: `1.5px solid ${showRestockMatDropdown ? '#3b82f6' : '#cbd5e1'}`, fontSize: '0.95rem', background: 'white', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', userSelect: 'none', transition: 'border 0.2s' }}
+                  >
+                    {restockForm.materialId ? (() => {
+                      const mat = materials.find(x => x.id === restockForm.materialId);
+                      const info = getMaterialStockInfo(restockForm.materialId, restockForm.outletId);
+                      return (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontWeight: '600', color: '#0f172a' }}>{mat?.name}</span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: info.isLow ? '#ef4444' : '#10b981', background: info.isLow ? '#fef2f2' : '#f0fdf4', padding: '2px 8px', borderRadius: '8px' }}>
+                            {info.qty} {info.unit}{info.isLow ? ' ⚠️' : ''}
+                          </span>
+                        </span>
+                      );
+                    })() : <span style={{ color: '#94a3b8' }}>-- Pilih Bahan --</span>}
+                    <span style={{ color: '#94a3b8', fontSize: '0.8rem', marginLeft: '8px' }}>{showRestockMatDropdown ? '▲' : '▼'}</span>
+                  </div>
+                  {/* Dropdown list */}
+                  {showRestockMatDropdown && (
+                    <>
+                      <div onClick={() => setShowRestockMatDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '14px', zIndex: 100, maxHeight: '240px', overflowY: 'auto', boxShadow: '0 12px 28px rgba(0,0,0,0.12)' }}>
+                        {materials.map((m, idx) => {
+                          const info = getMaterialStockInfo(m.id, restockForm.outletId);
+                          const isSelected = restockForm.materialId === m.id;
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => { setRestockForm(prev => ({...prev, materialId: m.id})); setShowRestockMatDropdown(false); }}
+                              style={{ padding: '11px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: idx < materials.length - 1 ? '1px solid #f1f5f9' : 'none', background: isSelected ? '#eff6ff' : info.isLow ? '#fffbeb' : 'transparent', transition: 'background 0.1s' }}
+                              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
+                              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = info.isLow ? '#fffbeb' : 'transparent'; }}
+                            >
+                              <span style={{ fontWeight: isSelected ? '700' : '500', color: '#0f172a', fontSize: '0.92rem' }}>{m.name}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: info.isLow ? '#ef4444' : '#10b981', background: info.isLow ? '#fef2f2' : '#f0fdf4', padding: '2px 10px', borderRadius: '8px' }}>
+                                  {info.qty} {info.unit}
+                                </span>
+                                {info.isLow && (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#dc2626', background: '#fee2e2', padding: '2px 7px', borderRadius: '6px' }}>⚠️ Menipis</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {/* hidden input for required validation */}
+                  <input type="text" required readOnly value={restockForm.materialId} style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} tabIndex={-1} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>

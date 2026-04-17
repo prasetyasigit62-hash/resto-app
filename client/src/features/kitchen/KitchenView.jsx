@@ -19,8 +19,9 @@ const KitchenView = () => {
       if (res.ok) {
         const allOrders = await res.json();
         const restaurantOrders = allOrders.filter(order =>
-          order.items.some(item => item.service === 'Restoran') &&
-          ['Pending', 'Processed', 'Completed'].includes(order.status)
+          (order.items || []).some(item => item.service === 'Restoran') &&
+          // ✨ FIX: Tambahkan 'Completed' agar pesanan yang sudah lunas ditarik juga
+          ['Pending', 'Cooking', 'Ready', 'Completed'].includes(order.status)
         );
         setOrders(restaurantOrders);
 
@@ -58,12 +59,19 @@ const KitchenView = () => {
     const controller = new AbortController();
     fetchOrders(controller.signal);
 
-    const socket = io(`http://${window.location.hostname}:3000`);
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const socket = io(backendUrl);
     socket.on('newOrder', () => { fetchOrders(controller.signal); });
 
+    // Polling fallback setiap 20 detik jika socket terputus
+    const pollInterval = setInterval(() => {
+      if (!socket.connected) fetchOrders(controller.signal);
+    }, 20000);
+
     return () => {
-      controller.abort(); // Batalkan fetch yang sedang berjalan saat unmount
+      controller.abort();
       socket.disconnect();
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -94,14 +102,16 @@ const KitchenView = () => {
 
   const columns = {
     Pending: orders.filter(o => o.status === 'Pending'),
-    Processed: orders.filter(o => o.status === 'Processed'),
-    Completed: orders.filter(o => o.status === 'Completed'),
+    Cooking: orders.filter(o => o.status === 'Cooking'),
+    Ready: orders.filter(o => o.status === 'Ready'),
+    Completed: orders.filter(o => o.status === 'Completed'), // ✨ Kolom baru untuk pesanan selesai
   };
 
   const columnTitles = {
-    Pending: { title: 'Pesanan Masuk', color: '#f39c12' },
-    Processed: { title: 'Sedang Dimasak', color: '#3498db' },
-    Completed: { title: 'Siap Disajikan', color: '#2ecc71' },
+    Pending: { title: 'BARU MASUK', color: '#f39c12' },
+    Cooking: { title: 'SEDANG DIMASAK', color: '#3498db' },
+    Ready: { title: 'SIAP DISAJIKAN', color: '#2ecc71' },
+    Completed: { title: 'SELESAI (LUNAS)', color: '#64748b' }, // ✨ Styling kolom baru (Abu-abu netral)
   };
 
   return (
@@ -111,7 +121,8 @@ const KitchenView = () => {
       
       {loading && <p>Memuat pesanan...</p>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '20px' }}>
+      {/* ✨ FIX: Ubah grid kolom dari 3 menjadi 4 agar kolom Selesai muat */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginTop: '20px' }}>
         {Object.keys(columns).map(statusKey => (
           <div key={statusKey} style={{ backgroundColor: 'var(--bg-color)', borderRadius: '12px', padding: '15px', minHeight: '500px', border: '1px solid var(--border-color)' }}>
             <h3 style={{ margin: '0 0 15px 0', paddingBottom: '10px', borderBottom: `3px solid ${columnTitles[statusKey].color}`, color: columnTitles[statusKey].color }}>
@@ -127,11 +138,11 @@ const KitchenView = () => {
                         {order.address}
                       </span>
                     )}
-                    <strong style={{ color: 'var(--primary-color)' }}>#{order.id}</strong>
+                    <strong style={{ color: 'var(--primary-color)' }}>{order.trackingNumber || `#${String(order.id).slice(0,8)}`}</strong>
                     <span style={{ fontSize: '0.8rem', color: '#888' }}>{new Date(order.date).toLocaleTimeString('id-ID')}</span>
                   </div>
                   <div style={{ borderTop: '1px dashed #ccc', paddingTop: '10px', fontSize: '0.95rem' }}>
-                    {order.items.filter(i => i.service === 'Restoran').map((item, idx) => (
+                    {(order.items || []).filter(i => i.service === 'Restoran').map((item, idx) => (
                       <div key={idx} style={{ marginBottom: '8px' }}>
                         - {item.name} <span style={{color:'#666', fontSize:'0.8rem', fontWeight:'bold'}}>x{item.qty}</span>
                         {item.note && (
@@ -152,12 +163,12 @@ const KitchenView = () => {
                   </div>
                   <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
                     {statusKey === 'Pending' && (
-                      <button onClick={() => handleUpdateStatus(order.id, 'Processed')} disabled={updatingId === order.id} style={{ flex: 1, padding: '8px', border:'none', borderRadius:'6px', cursor: updatingId === order.id ? 'not-allowed' : 'pointer', color:'white', background: '#3498db', fontWeight:'bold', opacity: updatingId === order.id ? 0.7 : 1 }}>
+                      <button onClick={() => handleUpdateStatus(order.id, 'Cooking')} disabled={updatingId === order.id} style={{ flex: 1, padding: '8px', border:'none', borderRadius:'6px', cursor: updatingId === order.id ? 'not-allowed' : 'pointer', color:'white', background: '#3498db', fontWeight:'bold', opacity: updatingId === order.id ? 0.7 : 1 }}>
                         {updatingId === order.id ? 'Memproses...' : 'Proses Masak'}
                       </button>
                     )}
-                    {statusKey === 'Processed' && (
-                      <button onClick={() => handleUpdateStatus(order.id, 'Completed')} disabled={updatingId === order.id} style={{ flex: 1, padding: '8px', border:'none', borderRadius:'6px', cursor: updatingId === order.id ? 'not-allowed' : 'pointer', color:'white', background: '#2ecc71', fontWeight:'bold', opacity: updatingId === order.id ? 0.7 : 1 }}>
+                    {statusKey === 'Cooking' && (
+                      <button onClick={() => handleUpdateStatus(order.id, 'Ready')} disabled={updatingId === order.id} style={{ flex: 1, padding: '8px', border:'none', borderRadius:'6px', cursor: updatingId === order.id ? 'not-allowed' : 'pointer', color:'white', background: '#2ecc71', fontWeight:'bold', opacity: updatingId === order.id ? 0.7 : 1 }}>
                         {updatingId === order.id ? 'Menyajikan...' : 'Sajikan'}
                       </button>
                     )}

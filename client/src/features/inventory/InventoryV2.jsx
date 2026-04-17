@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
-const InventoryV2 = ({ setConfirmModal }) => {
+const InventoryV2 = ({ setConfirmModal, user }) => {
   const [materials, setMaterials] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ id: null, name: '', unit: 'KG', lastPrice: '', minStock: '', supplierId: '', stock: '' });
+  const [recentlyUpdatedId, setRecentlyUpdatedId] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [sortConfig, setSortConfig] = useState({ column: 'name', direction: 'asc' });
 
   // ✨ Helper Format Rupiah Otomatis
   const formatRupiah = (value) => {
@@ -53,9 +56,14 @@ const InventoryV2 = ({ setConfirmModal }) => {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        const savedId = formData.id;
         toast.success(formData.id ? "Bahan baku berhasil diperbarui!" : "Bahan baku berhasil ditambahkan!");
         setShowModal(false);
         fetchData();
+        if (savedId) {
+          setRecentlyUpdatedId(savedId);
+          setTimeout(() => setRecentlyUpdatedId(null), 5000);
+        }
       } else {
         const err = await res.json();
         toast.error(err.error || "Gagal menyimpan bahan");
@@ -93,6 +101,39 @@ const InventoryV2 = ({ setConfirmModal }) => {
     }
   };
 
+  const handleSort = (column) => {
+    setSortConfig(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }) => {
+    if (sortConfig.column !== column) return <span style={{ color: '#cbd5e1', marginLeft: '4px', fontSize: '0.75rem' }}>⇅</span>;
+    return <span style={{ color: '#3b82f6', marginLeft: '4px', fontSize: '0.75rem' }}>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>;
+  };
+
+  const displayedMaterials = [...materials]
+    .filter(m => m.name.toLowerCase().includes(searchText.toLowerCase()))
+    .sort((a, b) => {
+      if (a.id === recentlyUpdatedId) return -1;
+      if (b.id === recentlyUpdatedId) return 1;
+      let aVal, bVal;
+      switch (sortConfig.column) {
+        case 'stock':
+          aVal = a.stocks?.reduce((acc, s) => acc + s.qty, 0) || 0;
+          bVal = b.stocks?.reduce((acc, s) => acc + s.qty, 0) || 0;
+          break;
+        case 'lastPrice': aVal = a.lastPrice; bVal = b.lastPrice; break;
+        case 'supplier': aVal = (a.supplier?.name || '').toLowerCase(); bVal = (b.supplier?.name || '').toLowerCase(); break;
+        case 'unit': aVal = (a.unit || '').toLowerCase(); bVal = (b.unit || '').toLowerCase(); break;
+        default: aVal = a.name.toLowerCase(); bVal = b.name.toLowerCase(); break;
+      }
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
   return (
     <div className="service-view">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -100,9 +141,27 @@ const InventoryV2 = ({ setConfirmModal }) => {
           <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#1e293b' }}>🌾 Master Bahan Baku (V2)</h2>
           <p style={{ color: '#64748b' }}>Kelola data bahan mentah, satuan, dan peringatan stok.</p>
         </div>
-        <button onClick={() => { setFormData({ id: null, name: '', unit: 'KG', lastPrice: '', minStock: '', supplierId: '', stock: '' }); setShowModal(true); }} className="profile-save-btn" style={{ width: 'auto' }}>
-          + Tambah Bahan
-        </button>
+        {['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role) && (
+          <button onClick={() => { setFormData({ id: null, name: '', unit: 'KG', lastPrice: '', minStock: '', supplierId: '', stock: '' }); setShowModal(true); }} className="profile-save-btn" style={{ width: 'auto' }}>
+            + Tambah Bahan
+          </button>
+        )}
+      </div>
+
+      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <input
+          type="text"
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          placeholder="🔍 Cari nama bahan baku..."
+          style={{ flex: 1, padding: '10px 16px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', outline: 'none', background: 'var(--card-bg)' }}
+        />
+        {searchText && (
+          <button onClick={() => setSearchText('')} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', color: '#64748b', fontSize: '0.9rem' }}>✕ Reset</button>
+        )}
+        <span style={{ fontSize: '0.85rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+          {displayedMaterials.length} / {materials.length} item
+        </span>
       </div>
 
       {loading ? <p>Memuat data...</p> : (
@@ -110,30 +169,39 @@ const InventoryV2 = ({ setConfirmModal }) => {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ textAlign: 'center' }}>Nama Bahan</th>
-                <th style={{ textAlign: 'center' }}>Stok Tersedia</th>
-                <th style={{ textAlign: 'center' }}>Satuan</th>
-                <th style={{ textAlign: 'center' }}>Harga Terakhir</th>
-                <th style={{ textAlign: 'center' }}>Supplier Utama</th>
+                <th onClick={() => handleSort('name')} style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>Nama Bahan <SortIcon column="name" /></th>
+                <th onClick={() => handleSort('stock')} style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>Stok Tersedia <SortIcon column="stock" /></th>
+                <th onClick={() => handleSort('unit')} style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>Satuan <SortIcon column="unit" /></th>
+                <th onClick={() => handleSort('lastPrice')} style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>Harga Terakhir <SortIcon column="lastPrice" /></th>
+                <th onClick={() => handleSort('supplier')} style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>Supplier Utama <SortIcon column="supplier" /></th>
                 <th style={{ textAlign: 'center' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
-              {materials.length === 0 ? <tr><td colSpan="5" style={{textAlign:'center', color:'#999'}}>Belum ada data bahan baku</td></tr> : materials.map(m => {
+              {displayedMaterials.length === 0 ? <tr><td colSpan="6" style={{textAlign:'center', color:'#999'}}>{materials.length === 0 ? 'Belum ada data bahan baku' : 'Tidak ada hasil yang cocok.'}</td></tr> : displayedMaterials.map(m => {
                  // Hitung total stok dari semua outlet (V2)
                  const totalStock = m.stocks?.reduce((acc, s) => acc + s.qty, 0) || 0;
                  const isLow = totalStock <= m.minStock;
                  return (
                   <tr key={m.id}>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#334155' }}>{m.name}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#334155' }}>
+                      {m.name}
+                      {m.id === recentlyUpdatedId && (
+                        <span style={{ marginLeft: '8px', fontSize: '0.7rem', background: '#d1fae5', color: '#059669', padding: '2px 8px', borderRadius: '10px', fontWeight: '700', verticalAlign: 'middle' }}>✓ Diperbarui</span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'center', color: isLow ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{totalStock} {m.unit || 'KG'} {isLow && '⚠️ Low'}</td>
                     <td style={{ textAlign: 'center' }}><span style={{background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold'}}>{m.unit || 'KG'}</span></td>
                     <td style={{ textAlign: 'center' }}>Rp {m.lastPrice.toLocaleString('id-ID')}</td>
                     <td style={{ textAlign: 'center' }}>{m.supplier ? m.supplier.name : '-'}</td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        <button onClick={() => { setFormData({ id: m.id, name: m.name, unit: m.unit || 'KG', lastPrice: formatRupiah(m.lastPrice), minStock: m.minStock, supplierId: m.supplierId || '', stock: totalStock }); setShowModal(true); }} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'white', cursor: 'pointer', fontWeight: '600', color: '#475569', fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit</button>
-                        <button onClick={() => handleDelete(m)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontWeight: '600', color: '#ef4444', fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus</button>
+                        {['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user?.role) && (
+                          <>
+                            <button onClick={() => { setFormData({ id: m.id, name: m.name, unit: m.unit || 'KG', lastPrice: formatRupiah(m.lastPrice), minStock: m.minStock, supplierId: m.supplierId || '', stock: totalStock }); setShowModal(true); }} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'white', cursor: 'pointer', fontWeight: '600', color: '#475569', fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit</button>
+                            <button onClick={() => handleDelete(m)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontWeight: '600', color: '#ef4444', fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

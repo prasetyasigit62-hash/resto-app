@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'auth_controller.dart';
-import 'dashboard_controller.dart';
-import 'inventory_screen.dart';
-import 'kpi_data.dart';
+import 'package:resto_app_flutter/features/auth/auth_controller.dart';
+import 'package:resto_app_flutter/features/dashboard/dashboard_controller.dart';
+import 'package:resto_app_flutter/models/kpi_data.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -17,8 +16,13 @@ class DashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('Dashboard, ${user?['username'] ?? 'User'}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+          ),
+        ],
       ),
-      drawer: const AppDrawer(), // Tambahkan Drawer di sini
       body: kpiData.when(
         data: (data) {
           return RefreshIndicator(
@@ -76,7 +80,6 @@ class DashboardScreen extends ConsumerWidget {
                           ...data.topSelling.map(
                             (item) => ListTile(
                               leading: const Icon(Icons.restaurant_menu),
-                              title: Text(item.menu),
                               trailing: Text(
                                 '${item.qty}x Terjual',
                                 style: const TextStyle(
@@ -158,57 +161,6 @@ class DashboardScreen extends ConsumerWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class AppDrawer extends ConsumerWidget {
-  const AppDrawer({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authControllerProvider).value;
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          UserAccountsDrawerHeader(
-            accountName: Text(user?['username'] ?? 'User'),
-            accountEmail: Text(user?['role'] ?? 'Role'),
-            currentAccountPicture: const CircleAvatar(
-              child: Icon(Icons.person),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.dashboard),
-            title: const Text('Dashboard'),
-            onTap: () {
-              Navigator.pop(context); // Tutup drawer
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.inventory_2),
-            title: const Text('Manajemen Inventori'),
-            onTap: () {
-              Navigator.pop(context); // Tutup drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const InventoryScreen()),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
-            onTap: () {
-              ref.read(authControllerProvider.notifier).logout();
-              Navigator.pop(context); // Tutup drawer
-            },
-          ),
-        ],
       ),
     );
   }

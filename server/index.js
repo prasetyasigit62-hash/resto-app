@@ -148,7 +148,7 @@ app.post('/api/v2/categories', authenticateToken, authorizeRole(['OWNER', 'ADMIN
 
 app.get('/api/v2/menus', authenticateToken, async (req, res) => {
   try {
-    const menus = await prisma.menu.findMany({ include: { category: true, recipes: { include: { material: true } } } });
+    const menus = await prisma.menu.findMany({ where: { isActive: true }, include: { category: true, recipes: { include: { material: true } } } });
     res.json(menus);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -171,6 +171,15 @@ app.delete('/api/v2/menus/:id', authenticateToken, authorizeRole(['OWNER', 'ADMI
   try { await prisma.menu.update({ where: { id: req.params.id }, data: { isActive: false } }); res.json({ message: 'Menu berhasil diarsipkan.' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ✨ Update stok porsi menu (dari tabel products lama)
+app.put('/api/products/:id/stock', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'superadmin']), async (req, res) => {
+  try {
+    const result = await pool.query('UPDATE products SET stock = $1 WHERE id = $2 RETURNING *', [Number(req.body.stock), req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Menu tidak ditemukan.' });
+    res.json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ==========================================
 // 🚀 SISTEM V2: SUPPLIER, MATERIAL & OUTLET STOCK (CLEAN & ANTI-BUG)
 // ==========================================
@@ -180,19 +189,23 @@ app.get(['/api/suppliers', '/api/v2/suppliers'], authenticateToken, async (req, 
   try { res.json(await prisma.supplier.findMany()); } catch (err) { res.status(500).json([]); }
 });
 
-app.post(['/api/suppliers', '/api/v2/suppliers'], authenticateToken, async (req, res) => {
-  try { res.status(201).json(await prisma.supplier.create({ data: { name: req.body.name, contact: req.body.contact || req.body.phone || '-', contactPerson: req.body.contactPerson || req.body.contact_person || '-', address: req.body.address } })); } 
+app.post(['/api/suppliers', '/api/v2/suppliers'], authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
+  try { res.status(201).json(await prisma.supplier.create({ data: { name: req.body.name, contact: req.body.contact || req.body.phone || '-', contactPerson: req.body.contactPerson || req.body.contact_person || '-', address: req.body.address } })); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put(['/api/suppliers/:id', '/api/v2/suppliers/:id'], authenticateToken, async (req, res) => {
-  try { res.json(await prisma.supplier.update({ where: { id: req.params.id }, data: { name: req.body.name, contact: req.body.contact || req.body.phone || '-', contactPerson: req.body.contactPerson || req.body.contact_person || '-', address: req.body.address } })); } 
+app.put(['/api/suppliers/:id', '/api/v2/suppliers/:id'], authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
+  try { res.json(await prisma.supplier.update({ where: { id: req.params.id }, data: { name: req.body.name, contact: req.body.contact || req.body.phone || '-', contactPerson: req.body.contactPerson || req.body.contact_person || '-', address: req.body.address } })); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete(['/api/suppliers/:id', '/api/v2/suppliers/:id'], authenticateToken, async (req, res) => {
-  try { await prisma.supplier.delete({ where: { id: req.params.id } }); res.json({ message: 'OK' }); } 
-  catch (err) { res.status(500).json({ error: err.message }); }
+app.delete(['/api/suppliers/:id', '/api/v2/suppliers/:id'], authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
+  try {
+    const used = await prisma.material.count({ where: { supplierId: req.params.id } });
+    if (used > 0) return res.status(400).json({ error: `Supplier tidak dapat dihapus karena masih dipakai oleh ${used} bahan baku. Ubah supplier pada bahan baku tersebut terlebih dahulu.` });
+    await prisma.supplier.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Supplier berhasil dihapus.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- MATERIALS & STOCKS V2 ---
@@ -201,8 +214,10 @@ app.get(['/api/ingredients', '/api/v2/materials'], authenticateToken, async (req
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/v2/materials', authenticateToken, async (req, res) => {
-  const { name, unit, lastPrice, minStock, supplierId, stock } = req.body;
+app.post(['/api/ingredients', '/api/v2/materials'], authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
+  const { name, unit, supplierId, stock } = req.body;
+  const lastPrice = req.body.lastPrice ?? req.body.cost ?? 0;
+  const minStock = req.body.minStock ?? req.body.min_stock ?? 0;
   try {
     // Pengecekan ID Supplier super ketat agar tidak ditolak database
     let cleanSupplierId = null;
@@ -226,8 +241,10 @@ app.post('/api/v2/materials', authenticateToken, async (req, res) => {
   } catch (err) { console.error('POST Material Error:', err); res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/v2/materials/:id', authenticateToken, async (req, res) => {
-  const { name, unit, lastPrice, minStock, supplierId, stock } = req.body;
+app.put(['/api/ingredients/:id', '/api/v2/materials/:id'], authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
+  const { name, unit, supplierId, stock } = req.body;
+  const lastPrice = req.body.lastPrice ?? req.body.cost ?? 0;
+  const minStock = req.body.minStock ?? req.body.min_stock ?? 0;
   try {
     let cleanSupplierId = null;
     if (supplierId && typeof supplierId === 'string' && supplierId.trim() !== '' && supplierId !== 'null' && supplierId !== 'undefined') {
@@ -256,7 +273,7 @@ app.put('/api/v2/materials/:id', authenticateToken, async (req, res) => {
   } catch (err) { console.error('PUT Material Error:', err); res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/v2/materials/:id', authenticateToken, async (req, res) => {
+app.delete(['/api/ingredients/:id', '/api/v2/materials/:id'], authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
   try {
     // ✨ FIX: Cegah hard-delete jika bahan sudah dipakai di resep/mutasi untuk mencegah error DB Constraint
     const checkUsage = await prisma.stockMutation.count({ where: { materialId: req.params.id } });
@@ -313,31 +330,43 @@ app.post('/api/v2/mutations/adjust', authenticateToken, authorizeRole(['OWNER', 
 });
 
 // ✨ FITUR V2: Catat Waste / Barang Rusak
-app.post('/api/v2/mutations/waste', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'CHEF']), async (req, res) => {
-  const { outletId, materialId, wasteQty, note } = req.body;
+app.post(['/api/v2/mutations/waste', '/api/inventory/waste'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'CHEF']), async (req, res) => {
+  const materialId = req.body.materialId || req.body.ingredientId;
+  const wasteQty = req.body.wasteQty ?? req.body.qty;
+  const note = req.body.note || req.body.reason || 'Barang Rusak / Terbuang';
   try {
     await syncV2User(req.user);
-    const targetOutletId = outletId || req.user.outletId;
-    if (!targetOutletId) return res.status(400).json({ error: 'Outlet ID wajib.' });
+    let targetOutletId = req.body.outletId || req.user.outletId;
+    if (!targetOutletId) {
+      const firstOutlet = await prisma.outlet.findFirst();
+      if (!firstOutlet) return res.status(400).json({ error: 'Tidak ada outlet tersedia.' });
+      targetOutletId = firstOutlet.id;
+    }
     const currentStock = await prisma.outletStock.findUnique({ where: { outletId_materialId: { outletId: targetOutletId, materialId } } });
     const oldQty = currentStock ? currentStock.qty : 0;
     if (oldQty < Number(wasteQty)) return res.status(400).json({ error: `Stok tidak cukup. Sisa stok: ${oldQty}` });
 
     await prisma.$transaction(async (tx) => {
       await tx.outletStock.update({ where: { outletId_materialId: { outletId: targetOutletId, materialId } }, data: { qty: oldQty - Number(wasteQty) } });
-      await tx.stockMutation.create({ data: { outletId: targetOutletId, materialId, userId: req.user.id, qty: -Number(wasteQty), type: 'OUT_WASTE', note: note || 'Barang Rusak / Terbuang' } });
+      await tx.stockMutation.create({ data: { outletId: targetOutletId, materialId, userId: req.user.id, qty: -Number(wasteQty), type: 'OUT_WASTE', note } });
     });
     res.json({ message: 'Waste (Barang rusak) berhasil dicatat dan stok dikurangi.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ✨ FITUR V2: Quick Restock Manual (Tanpa PO)
-app.post('/api/v2/mutations/restock', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'CHEF']), async (req, res) => {
-  const { outletId, materialId, qty, cost, supplierId, note } = req.body;
+app.post(['/api/v2/mutations/restock', '/api/inventory/restock'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'CHEF']), async (req, res) => {
+  const materialId = req.body.materialId || req.body.ingredientId;
+  const { qty, cost, note } = req.body;
+  const supplierId = req.body.supplierId || null;
   try {
     await syncV2User(req.user);
-    const targetOutletId = outletId || req.user.outletId;
-    if (!targetOutletId) return res.status(400).json({ error: 'Outlet ID wajib.' });
+    let targetOutletId = req.body.outletId || req.user.outletId;
+    if (!targetOutletId) {
+      const firstOutlet = await prisma.outlet.findFirst();
+      if (!firstOutlet) return res.status(400).json({ error: 'Tidak ada outlet tersedia.' });
+      targetOutletId = firstOutlet.id;
+    }
     
     await prisma.$transaction(async (tx) => {
       await tx.outletStock.upsert({ where: { outletId_materialId: { outletId: targetOutletId, materialId } }, update: { qty: { increment: Number(qty) } }, create: { outletId: targetOutletId, materialId, qty: Number(qty) } });
@@ -435,9 +464,9 @@ app.get('/api/v2/dashboard/kpi', authenticateToken, authorizeRole(['OWNER', 'ADM
         whereOutlet.outletId = req.query.outletId;
     }
 
-    // 1. Total Omzet Hari Ini
+    // 1. Total Omzet Hari Ini (Hanya menghitung yang sudah [LUNAS] atau COMPLETED)
     const todayOrders = await prisma.order.aggregate({
-      where: { createdAt: { gte: today }, status: 'COMPLETED', ...whereOutlet },
+      where: { createdAt: { gte: today }, OR: [ { status: 'COMPLETED' }, { receiptNumber: { contains: '[LUNAS]' } } ], ...whereOutlet },
       _sum: { total: true }
     });
 
@@ -460,7 +489,7 @@ app.get('/api/v2/dashboard/kpi', authenticateToken, authorizeRole(['OWNER', 'ADM
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const recentOrders = await prisma.order.findMany({
-        where: { createdAt: { gte: sevenDaysAgo }, status: 'COMPLETED', ...whereOutlet },
+        where: { createdAt: { gte: sevenDaysAgo }, OR: [ { status: 'COMPLETED' }, { receiptNumber: { contains: '[LUNAS]' } } ], ...whereOutlet },
         select: { total: true, createdAt: true }
     });
 
@@ -494,7 +523,7 @@ app.get('/api/v2/dashboard/kpi', authenticateToken, authorizeRole(['OWNER', 'ADM
 
 app.get('/api/v2/reports/sales', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), async (req, res) => {
     const { startDate, endDate, outletId, chefId } = req.query;
-    let whereClause = { status: 'COMPLETED' };
+    let whereClause = { OR: [ { status: 'COMPLETED' }, { receiptNumber: { contains: '[LUNAS]' } } ] };
     
     if (startDate && endDate) {
          // Set filter diantara 2 range tanggal
@@ -546,7 +575,7 @@ app.get('/api/v2/reports/outlets-comparison', authenticateToken, authorizeRole([
     const outlets = await prisma.outlet.findMany({
       include: {
         orders: {
-          where: { status: 'COMPLETED', ...(startDate && { createdAt: dateFilter }) },
+          where: { OR: [ { status: 'COMPLETED' }, { receiptNumber: { contains: '[LUNAS]' } } ], ...(startDate && { createdAt: dateFilter }) },
           select: { total: true, id: true }
         }
       }
@@ -632,7 +661,7 @@ app.get('/api/v2/analytics/smart-insights', authenticateToken, authorizeRole(['O
 
     // a. Data Penjualan (Kasir)
     const todayOrders = await prisma.order.aggregate({
-      where: { createdAt: { gte: today }, status: 'COMPLETED' },
+      where: { createdAt: { gte: today }, OR: [ { status: 'COMPLETED' }, { receiptNumber: { contains: '[LUNAS]' } } ] },
       _sum: { total: true }, _count: { id: true }
     });
 
@@ -699,9 +728,24 @@ app.post(['/api/orders', '/api/v2/orders', '/api/public/orders'], authenticateTo
         else return res.status(400).json({ error: 'Belum ada data Outlet untuk proses transaksi.' });
     }
 
-    const receiptNumber = `ORD-${Date.now().toString().slice(-6)}`;
-    const statusEnum = paymentMethod === 'Open Bill' ? 'PENDING' : 'COMPLETED';
-    const pmEnum = paymentMethod === 'Open Bill' ? 'CASH' : paymentMethod.toUpperCase();
+    // ✨ FITUR BARU: Penamaan Nota (Tracking) Berdasarkan Kategori Menu Dominan
+    const categoriesSet = new Set();
+    items.forEach(i => {
+        if (i.cuisine && i.cuisine !== 'Umum') categoriesSet.add(i.cuisine.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 8));
+        else if (i.category && i.category !== 'Umum') categoriesSet.add(i.category.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 8));
+    });
+    const categoriesArr = Array.from(categoriesSet);
+    const catLabel = categoriesArr.length > 1 ? 'MIX' : (categoriesArr.length === 1 ? categoriesArr[0] : 'UMUM');
+    
+    const baseReceipt = `ORD-${Date.now().toString().slice(-6)}-${catLabel}`;
+    const tableName = address || 'Takeaway';
+    const custName = customerNameOverride ? ` (${customerNameOverride})` : '';
+    const payStatus = paymentMethod === 'Open Bill' ? '[BELUM BAYAR]' : `[LUNAS-${paymentMethod.toUpperCase()}]`;
+    const receiptNumber = `${baseReceipt} | ${tableName}${custName} ${payStatus}`;
+    
+    const statusEnum = 'PENDING'; // ✨ Semua pesanan WAJIB masuk antrean KDS (Dapur)
+    const pmMap = { 'Tunai': 'CASH', 'Kartu': 'DEBIT', 'QRIS': 'QRIS', 'Lainnya': 'CASH' };
+    const pmEnum = paymentMethod === 'Open Bill' ? 'CASH' : (pmMap[paymentMethod] || 'CASH');
 
     // Jalankan transaksi database (All-or-Nothing)
     const newOrder = await prisma.$transaction(async (tx) => {
@@ -1145,6 +1189,8 @@ const initializeAndMigrateData = async () => {
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS last_modified TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP").catch(() => { });
     await pool.query("ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS last_modified TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP").catch(() => { });
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS service_name VARCHAR(100) DEFAULT 'restoran'").catch(() => { });
+    await pool.query("ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP WITH TIME ZONE").catch(() => { });
+    await pool.query("ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS quota INT DEFAULT -1").catch(() => { });
 
     // ✨ FIX: Tambahkan contactPerson ke tabel Supplier V2 secara aman tanpa Prisma Push
     await pool.query('ALTER TABLE "Supplier" ADD COLUMN IF NOT EXISTS "contactPerson" TEXT').catch(() => { });
@@ -1319,6 +1365,13 @@ const initializeAndMigrateData = async () => {
       } catch(e) {}
     }
 
+    // ✨ FIX: Pastikan menu "Manajemen Pesanan" (Tracking Nota) muncul di Sidebar Admin/Owner
+    const checkOrdersMenu = await pool.query("SELECT id FROM app_menus WHERE service_name = 'Orders'");
+    if (checkOrdersMenu.rowCount === 0) {
+        await pool.query("INSERT INTO app_menus (title, icon, service_name, allowed_roles, sort_order, category) VALUES ($1, $2, $3, $4, $5, $6)", ['Manajemen Pesanan', '📋', 'Orders', '["OWNER","ADMIN","SUPERADMIN"]', 7, 'OPERASIONAL RESTORAN']);
+        console.log('[MIGRASI] Menu Lacak Manajemen Pesanan ditambahkan ke DB.');
+    }
+
   } catch (err) { console.error('Gagal inisialisasi data:', err); }
 };
 initializeAndMigrateData(); // Panggil fungsi ini
@@ -1437,7 +1490,7 @@ app.post(['/api/shifts/end', '/api/v2/shifts/end'], authenticateToken, async (re
   }
 });
 
-app.get(['/api/shifts/history', '/api/v2/shifts/history'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'admin', 'superadmin', 'staff', 'KASIR']), async (req, res) => {
+app.get(['/api/shifts/history', '/api/v2/shifts/history'], authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'SUPERADMIN', 'admin', 'superadmin', 'staff', 'KASIR']), async (req, res) => {
   try {
     const shifts = await prisma.shift.findMany({ where: { status: 'closed' }, include: { user: { select: { username: true } } }, orderBy: { endTime: 'desc' } });
     // Map back to V1 format for frontend compatibility
@@ -1627,6 +1680,56 @@ app.get(['/api/tables', '/api/v2/tables'], authenticateToken, async (req, res) =
   }
 });
 
+// CRUD Endpoints untuk Manajemen Meja
+app.post('/api/tables', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'SUPERADMIN']), async (req, res) => {
+  const { name, status } = req.body;
+  if (!name) return res.status(400).json({ error: 'Nama meja wajib diisi.' });
+  try {
+    const existing = await pool.query('SELECT id FROM tables WHERE LOWER(name) = LOWER($1)', [name]);
+    if (existing.rows.length > 0) return res.status(400).json({ error: `Meja dengan nama "${name}" sudah ada.` });
+    const result = await pool.query(
+      'INSERT INTO tables (name, status, x, y) VALUES ($1, $2, 0, 0) RETURNING *',
+      [name, status || 'Available']
+    );
+    logActivity('CREATE', 'Restoran', `Meja baru ditambahkan: ${name}`);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
+app.put('/api/tables/:id', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'SUPERADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const { name, status } = req.body;
+  if (!name) return res.status(400).json({ error: 'Nama meja wajib diisi.' });
+  try {
+    const existing = await pool.query('SELECT id FROM tables WHERE LOWER(name) = LOWER($1) AND id != $2', [name, id]);
+    if (existing.rows.length > 0) return res.status(400).json({ error: `Nama meja "${name}" sudah dipakai meja lain.` });
+    const result = await pool.query(
+      'UPDATE tables SET name = $1, status = $2 WHERE id = $3 RETURNING *',
+      [name, status || 'Available', id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Meja tidak ditemukan.' });
+    logActivity('UPDATE', 'Restoran', `Meja diperbarui: ${name}`);
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
+app.delete('/api/tables/:id', authenticateToken, authorizeRole(['OWNER', 'ADMIN', 'SUPERADMIN']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const table = await pool.query('SELECT name FROM tables WHERE id = $1', [id]);
+    if (table.rows.length === 0) return res.status(404).json({ error: 'Meja tidak ditemukan.' });
+    await pool.query('DELETE FROM tables WHERE id = $1', [id]);
+    logActivity('DELETE', 'Restoran', `Meja dihapus: ${table.rows[0].name}`);
+    res.json({ message: 'Meja berhasil dihapus.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
 // ✨ NEW: Endpoints Customers
 app.get(['/api/customers', '/api/v2/customers', '/api/crm', '/api/CRM', '/api/Customers'], authenticateToken, async (req, res) => {
   try {
@@ -1650,31 +1753,6 @@ app.post(['/api/customers', '/api/v2/customers'], authenticateToken, authorizeRo
     console.error('Error adding customer:', err);
     res.status(500).json({ error: 'Database error' });
   }
-});
-
-// ✨ NEW: Endpoints Vouchers & Promo
-app.get(['/api/vouchers', '/api/v2/vouchers', '/api/Vouchers'], authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM vouchers ORDER BY id DESC');
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: 'Database error' }); }
-});
-app.post(['/api/add/vouchers', '/api/add/Vouchers'], authenticateToken, authorizeRole(['admin', 'superadmin', 'OWNER', 'ADMIN']), async (req, res) => {
-  const { name, code, type, value, minOrder, isActive } = req.body;
-  try {
-    const result = await pool.query('INSERT INTO vouchers (name, code, type, value, min_order, is_active) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [name, code, type, value, minOrder || 0, isActive !== false]);
-    res.status(201).json({ message: 'Success', data: result.rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.put(['/api/update/vouchers/:id', '/api/update/Vouchers/:id'], authenticateToken, authorizeRole(['admin', 'superadmin', 'OWNER', 'ADMIN']), async (req, res) => {
-  const { name, code, type, value, minOrder, isActive } = req.body;
-  try {
-    const result = await pool.query('UPDATE vouchers SET name=$1, code=$2, type=$3, value=$4, min_order=$5, is_active=$6 WHERE id=$7 RETURNING *', [name, code, type, value, minOrder || 0, isActive !== false, req.params.id]);
-    res.json({ message: 'Updated successfully', data: result.rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.delete(['/api/delete/vouchers/:id', '/api/delete/Vouchers/:id'], authenticateToken, authorizeRole(['admin', 'superadmin', 'OWNER', 'ADMIN']), async (req, res) => {
-  try { await pool.query('DELETE FROM vouchers WHERE id=$1', [req.params.id]); res.json({ message: 'Deleted successfully' }); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ✨ NEW: Endpoint untuk mengambil dan menyimpan denah meja
@@ -1782,7 +1860,7 @@ app.get('/api/system/backup', authenticateToken, authorizeRole(['admin', 'supera
       v2_postgres: v2Data
     };
 
-    const fileName = `superapp_full_backup_${Date.now()}.json`;
+    const fileName = `restoapp_full_backup_${Date.now()}.json`;
     const filePath = path.join(__dirname, 'uploads', fileName);
     
     // Tulis file sementara ke disk, lalu kirim ke client
@@ -1798,7 +1876,7 @@ app.get('/api/system/backup', authenticateToken, authorizeRole(['admin', 'supera
 app.post('/api/system/restore', authenticateToken, authorizeRole(['admin', 'superadmin', 'OWNER', 'ADMIN']), (req, res) => {
   const newData = req.body;
   
-  // ✨ CERDAS: Ekstrak hanya data V1 jika user mengupload "Super Backup" yang baru
+  // ✨ CERDAS: Ekstrak hanya data V1 jika user mengupload "Resto-app Backup" yang baru
   const dataToRestore = newData.v1_legacy ? newData.v1_legacy : newData;
 
   // Validasi sederhana struktur data
@@ -2186,20 +2264,38 @@ app.get(['/api/orders', '/api/v2/orders/history'], authenticateToken, authorizeR
             orderBy: { createdAt: 'desc' },
             take: 100
         });
-        v2Orders = v2Raw.map(o => ({
+        v2Orders = v2Raw.map(o => {
+            // Parse Label receiptNumber: "ORD-123456 | Meja 5 [LUNAS-QRIS]"
+            const receipt = o.receiptNumber || '';
+            const isBelumBayar = receipt.includes('[BELUM BAYAR]');
+            let displayCustName = receipt || String(o.id);
+            let refNumber = receipt.split(' | ')[0] || String(o.id);
+            
+            let tableExtracted = o.outlet?.name || '-';
+            if (receipt.includes(' | ')) {
+                displayCustName = receipt.split(' | ')[1];
+            } else if (!receipt) {
+                displayCustName = o.customerName || 'Takeaway';
+            }
+            
+            return {
             id: o.id,
             date: o.createdAt.toISOString(),
-            customerName: o.receiptNumber, // Gunakan No. Resi sebagai pengenal
-            address: o.outlet?.name || '-',
+            customerName: displayCustName,
+            address: tableExtracted,
             total: o.total,
-            paymentMethod: o.paymentMethod,
+            paymentMethod: isBelumBayar ? 'Open Bill' : (o.paymentMethod || 'Tunai'),
             status: o.status === 'COMPLETED' ? 'Completed' : (o.status === 'PENDING' ? 'Pending' : (o.status === 'COOKING' ? 'Cooking' : (o.status === 'SERVED' ? 'Ready' : 'Cancelled'))),
-            items: o.items.map(i => ({ id: i.menuId, name: i.menu?.name || i.itemName, qty: i.qty, price: i.price })),
+            // ✨ FIX: Tambahkan properti 'service' agar lolos filter di frontend
+        items: (o.items || []).map(i => ({ id: i.menuId, name: i.menu?.name || i.itemName, qty: i.qty, price: i.price, service: 'Restoran' })),
             processedBy: o.kasirId,
             seller_name: o.kasir?.username,
-            trackingNumber: o.receiptNumber
-        }));
-    } catch(e) {}
+            trackingNumber: refNumber
+            }
+        });
+    } catch(e) {
+        console.error("Error mapping V2 orders in history:", e);
+    }
 
     // 3. Gabung dan Sortir Berdasarkan Tanggal Terbaru
     const allOrders = [...orders, ...v2Orders].sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -2252,8 +2348,35 @@ app.put(['/api/orders/:id/status', '/api/v2/orders/:id/status'], authenticateTok
         else if (status === 'Ready' || status === 'SERVED' || status === 'Siap Disajikan') v2Status = 'SERVED';
         else if (status === 'Cancelled' || status === 'CANCELLED') v2Status = 'CANCELLED';
 
-        const updatedOrder = await prisma.order.update({ where: { id }, data: { status: v2Status }, include: { items: true } });
+        let updateData = { status: v2Status };
         
+        // Jika kasir menekan "Selesaikan / Bayar", ubah label receipt dari Belum Bayar menjadi Lunas
+        if (v2Status === 'COMPLETED' && req.body.paymentMethod) {
+            const order = await prisma.order.findUnique({ where: { id } });
+            if (order && order.receiptNumber && order.receiptNumber.includes('[BELUM BAYAR]')) {
+                updateData.receiptNumber = order.receiptNumber.replace('[BELUM BAYAR]', `[LUNAS-${req.body.paymentMethod.toUpperCase()}]`);
+                const pmMap = { 'Tunai': 'CASH', 'Kartu': 'DEBIT', 'QRIS': 'QRIS', 'Lainnya': 'CASH' };
+                updateData.paymentMethod = pmMap[req.body.paymentMethod] || 'CASH';
+            }
+            
+            // ✨ FIX: Simpan total baru jika ada diskon menyusul, potong kuota voucher & poin
+            if (req.body.total !== undefined) updateData.total = Number(req.body.total);
+            
+            if (req.body.voucherCode) {
+                await prisma.voucher.updateMany({ where: { code: req.body.voucherCode, quota: { gt: 0 } }, data: { quota: { decrement: 1 } } });
+            }
+            if (req.body.memberId) {
+                const cust = await prisma.customer.findUnique({ where: { id: String(req.body.memberId) } });
+                if (cust) {
+                    let newPoints = cust.points >= Number(req.body.redeemPoints || 0) ? cust.points - Number(req.body.redeemPoints || 0) : cust.points;
+                    newPoints += Math.floor(Number(req.body.total || updateData.total || (order ? order.total : 0)) / 1000);
+                    await prisma.customer.update({ where: { id: String(req.body.memberId) }, data: { points: newPoints } });
+                }
+            }
+        }
+
+        const updatedOrder = await prisma.order.update({ where: { id }, data: updateData, include: { items: true } });
+
         // ✨ FIX: Restore Stok BOM secara otomatis jika pesanan V2 dibatalkan (Void)
         if (v2Status === 'CANCELLED') {
             for (const item of updatedOrder.items) {
@@ -2314,7 +2437,28 @@ app.put(['/api/orders/:id/status', '/api/v2/orders/:id/status'], authenticateTok
 
     // ✨ FIX: Jika Kasir mengupdate Open Bill dengan metode bayar baru (Tunai/QRIS), simpan ke database!
     if (req.body.paymentMethod) {
-      await pool.query('UPDATE orders SET status = $1, payment_method = $2 WHERE id = $3', [status, req.body.paymentMethod, id]);
+      let updateQuery = 'UPDATE orders SET status = $1, payment_method = $2';
+      let queryParams = [status, req.body.paymentMethod];
+      if (req.body.total !== undefined) {
+         updateQuery += ', total = $3';
+         queryParams.push(req.body.total);
+      }
+      updateQuery += ` WHERE id = $${queryParams.length + 1}`;
+      queryParams.push(id);
+      await pool.query(updateQuery, queryParams);
+      
+      if (req.body.memberId) {
+         const custCheck = await pool.query('SELECT points FROM customers WHERE id = $1', [req.body.memberId]);
+         if (custCheck.rows.length > 0) {
+             const currentPts = custCheck.rows[0].points;
+             let newPts = currentPts >= Number(req.body.redeemPoints || 0) ? currentPts - Number(req.body.redeemPoints || 0) : currentPts;
+             newPts += Math.floor(Number(req.body.total || order.total) / 1000);
+             await pool.query('UPDATE customers SET points = $1 WHERE id = $2', [newPts, req.body.memberId]);
+         }
+      }
+      if (req.body.voucherCode) {
+         await pool.query('UPDATE vouchers SET quota = quota - 1 WHERE code = $1 AND quota > 0', [req.body.voucherCode]);
+      }
     } else {
       await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
     }
@@ -2438,24 +2582,34 @@ app.post(['/api/customers', '/api/v2/customers'], authenticateToken, async (req,
 // --- VOUCHERS V2 ---
 app.get(['/api/vouchers', '/api/v2/vouchers', '/api/Vouchers'], authenticateToken, async (req, res) => {
   try { 
-    const vouchers = await prisma.voucher.findMany({ orderBy: { createdAt: 'desc' } });
-    res.json(vouchers.map(v => ({ ...v, min_order: v.minOrder, is_active: v.isActive }))); 
+    const result = await pool.query('SELECT * FROM vouchers ORDER BY id DESC');
+    res.json(result.rows.map(v => ({ ...v, minOrder: v.min_order, isActive: v.is_active, expiryDate: v.expiry_date })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.post(['/api/add/vouchers', '/api/add/Vouchers'], authenticateToken, async (req, res) => {
+app.post(['/api/vouchers', '/api/add/vouchers', '/api/add/Vouchers'], authenticateToken, async (req, res) => {
   try { 
-    const v = await prisma.voucher.create({ data: { name: req.body.name, code: req.body.code, type: req.body.type, value: Number(req.body.value), minOrder: Number(req.body.minOrder || 0), isActive: req.body.isActive !== false } });
-    res.status(201).json({ message: 'Success', data: { ...v, min_order: v.minOrder, is_active: v.isActive } });
+    const { name, code, type, value, minOrder, isActive, quota, expiryDate } = req.body;
+    const result = await pool.query(
+      'INSERT INTO vouchers (name, code, type, value, min_order, is_active, quota, expiry_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [name, code, type, Number(value), Number(minOrder || 0), isActive !== false, Number(quota !== undefined ? quota : -1), expiryDate ? new Date(expiryDate) : null]
+    );
+    const v = result.rows[0];
+    res.status(201).json({ message: 'Success', data: { ...v, minOrder: v.min_order, isActive: v.is_active, expiryDate: v.expiry_date } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.put(['/api/update/vouchers/:id', '/api/update/Vouchers/:id'], authenticateToken, async (req, res) => {
+app.put(['/api/vouchers/:id', '/api/update/vouchers/:id', '/api/update/Vouchers/:id'], authenticateToken, async (req, res) => {
   try { 
-    const v = await prisma.voucher.update({ where: { id: req.params.id }, data: { name: req.body.name, code: req.body.code, type: req.body.type, value: Number(req.body.value), minOrder: Number(req.body.minOrder || 0), isActive: req.body.isActive !== false } });
-    res.json({ message: 'Success', data: { ...v, min_order: v.minOrder, is_active: v.isActive } });
+    const { name, code, type, value, minOrder, isActive, quota, expiryDate } = req.body;
+    const result = await pool.query(
+      'UPDATE vouchers SET name=$1, code=$2, type=$3, value=$4, min_order=$5, is_active=$6, quota=$7, expiry_date=$8 WHERE id=$9 RETURNING *',
+      [name, code, type, Number(value), Number(minOrder || 0), isActive !== false, Number(quota !== undefined ? quota : -1), expiryDate ? new Date(expiryDate) : null, req.params.id]
+    );
+    const v = result.rows[0];
+    res.json({ message: 'Success', data: { ...v, minOrder: v.min_order, isActive: v.is_active, expiryDate: v.expiry_date } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.delete(['/api/delete/vouchers/:id', '/api/delete/Vouchers/:id'], authenticateToken, async (req, res) => {
-  try { await prisma.voucher.delete({ where: { id: req.params.id } }); res.json({ message: 'Deleted' }); } 
+app.delete(['/api/vouchers/:id', '/api/delete/vouchers/:id', '/api/delete/Vouchers/:id'], authenticateToken, async (req, res) => {
+  try { await pool.query('DELETE FROM vouchers WHERE id=$1', [req.params.id]); res.json({ message: 'Deleted' }); } 
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2519,7 +2673,9 @@ app.get(['/api/reservations', '/api/v2/reservations', '/api/Reservations'], auth
 });
 app.post(['/api/reservations', '/api/add/reservations', '/api/add/Reservations'], authenticateToken, async (req, res) => {
   try {
-    const newRes = await prisma.reservation.create({ data: { customerName: req.body.customerName || req.body.customer_name, contact: req.body.contact, reservationDate: new Date(req.body.date || req.body.reservation_date), reservationTime: req.body.time || req.body.reservation_time, pax: parseInt(req.body.pax), tableId: req.body.tableId ? String(req.body.tableId) : null, note: req.body.note, status: 'Menunggu Pembayaran', paymentDeadline: new Date(Date.now() + 2 * 60 * 60 * 1000), outletId: req.user.outletId || null } });
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const tableId = req.body.tableId && uuidRegex.test(String(req.body.tableId)) ? String(req.body.tableId) : null;
+    const newRes = await prisma.reservation.create({ data: { customerName: req.body.customerName || req.body.customer_name, contact: req.body.contact, reservationDate: new Date(req.body.date || req.body.reservation_date), reservationTime: req.body.time || req.body.reservation_time, pax: parseInt(req.body.pax), tableId, note: req.body.note, status: 'Menunggu Pembayaran', paymentDeadline: new Date(Date.now() + 2 * 60 * 60 * 1000), outletId: req.user.outletId || null } });
     logActivity('RESERVATION', 'Restoran', `Reservasi baru: ${newRes.customerName}`);
     res.status(201).json({ message: 'Success', data: newRes });
   } catch (err) { res.status(500).json({ error: err.message }); }

@@ -130,13 +130,22 @@ function App() {
       }).catch(() => {});
   }, []);
 
-  // ✨ FETCH DAFTAR OUTLET UNTUK DROPDOWN HEADER
+  // ✨ FETCH DAFTAR OUTLET UNTUK DROPDOWN HEADER (semua user)
   useEffect(() => {
-    if (user && ['OWNER', 'ADMIN', 'SUPERADMIN'].includes(String(user.role).toUpperCase())) {
+    if (user) {
         const token = localStorage.getItem('resto_token');
         fetch(`${getBackendUrl()}/api/v2/outlets`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.json())
-            .then(data => setOutlets(Array.isArray(data) ? data : []))
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setOutlets(data);
+                    // Untuk non-admin, otomatis set ke cabang mereka sendiri
+                    const role = String(user.role || '').toUpperCase();
+                    if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(role) && user.outletId) {
+                        setActiveOutletId(user.outletId);
+                    }
+                }
+            })
             .catch(err => console.error("Gagal load outlets untuk dropdown:", err));
     }
   }, [user]);
@@ -986,16 +995,20 @@ function App() {
               {Object.keys(dynamicMenus).length === 0 ? (
                   <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Memuat Menu...</div>
               ) : (
-                  Object.entries(dynamicMenus).map(([category, menus], idx) => (
-                      <React.Fragment key={category}>
-                          <div className="menu-label" style={{ marginTop: idx === 0 ? '10px' : '20px' }}>{category}</div>
-                          {Array.isArray(menus) && menus.map(menu => (
-                              <button key={menu.service_name} onClick={() => setActiveService(menu.service_name)} className={`menu-item ${activeService === menu.service_name ? 'active' : ''}`}>
-                                  <span style={{ marginRight: '10px' }}>{menu.icon}</span> {menu.title}
-                              </button>
-                          ))}
-                      </React.Fragment>
-                  ))
+                  Object.entries(dynamicMenus).map(([category, menus], idx) => {
+                      const visibleMenus = Array.isArray(menus) ? menus.filter(m => m.service_name !== 'AiInsights') : [];
+                      if (visibleMenus.length === 0) return null;
+                      return (
+                          <React.Fragment key={category}>
+                              <div className="menu-label" style={{ marginTop: idx === 0 ? '10px' : '20px' }}>{category}</div>
+                              {visibleMenus.map(menu => (
+                                  <button key={menu.service_name} onClick={() => setActiveService(menu.service_name)} className={`menu-item ${activeService === menu.service_name ? 'active' : ''}`}>
+                                      <span style={{ marginRight: '10px' }}>{menu.icon}</span> {menu.title}
+                                  </button>
+                              ))}
+                          </React.Fragment>
+                      );
+                  })
               )}
 
               {isAdminOrOwner && (
@@ -1049,7 +1062,7 @@ function App() {
           </div>
           <div className="topbar-right">
 
-            {isAdminOrOwner && (
+            {isAdminOrOwner ? (
                 <div className="branch-selector" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '20px', background: 'var(--card-bg)', padding: '5px 15px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '1.2rem' }}>🏢</span>
                   <select
@@ -1064,7 +1077,14 @@ function App() {
                     {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                 </div>
-            )}
+            ) : user?.outletId && outlets.length > 0 ? (
+                <div className="branch-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '20px', background: 'var(--card-bg)', padding: '5px 15px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🏢</span>
+                  <span style={{ fontWeight: 'bold', color: 'var(--text-color)', fontSize: '0.9rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {outlets.find(o => o.id === user.outletId)?.name || 'Cabang Anda'}
+                  </span>
+                </div>
+            ) : null}
 
             <div className="notification-wrapper" style={{ position: 'relative', marginRight: '15px' }}>
               <button
@@ -1125,17 +1145,6 @@ function App() {
               )}
             </div>
 
-            {activeService !== 'BackOffice' && activeService !== 'Dashboard' && activeService !== 'Settings' && activeService !== 'ActivityLog' && activeService !== 'Help' && (
-              <div className="search-wrapper">
-                <input
-                  type="text"
-                  placeholder="Cari data..."
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  className="search-input"
-                />
-              </div>
-            )}
             <button onClick={() => setDarkMode(!darkMode)} className="theme-toggle" title="Toggle Theme">
               {darkMode ? '☀️' : '🌙'}
             </button>
@@ -1147,7 +1156,7 @@ function App() {
             <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <input type="file" id="import-file" accept=".csv" style={{ display: 'none' }} onChange={handleFileChange} />
 
-          {String(user.role || '').toLowerCase() === 'admin' && (
+          {['OWNER', 'ADMIN', 'SUPERADMIN', 'admin', 'superadmin'].includes(user?.role) && (
                 <button onClick={handleImportClick} className="btn-success-sm" style={{ backgroundColor: '#3498db', padding: '8px 15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   📥 Import CSV
                 </button>
@@ -1164,7 +1173,7 @@ function App() {
           {selectedIds.length > 0 && (
             <div className="selection-bar">
               <span>{selectedIds.length} item dipilih</span>
-              {user.role === 'admin' && (
+              {['OWNER', 'ADMIN', 'SUPERADMIN', 'admin', 'superadmin'].includes(user?.role) && (
                 <button onClick={requestDeleteSelected} className="btn-danger-sm">Hapus Terpilih</button>
               )}
             </div>

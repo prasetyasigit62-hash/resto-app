@@ -63,7 +63,7 @@ export const usePos = (props) => {
   const [noteInput, setNoteInput] = useState('');
 
   useEffect(() => {
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     const socket = io(backendUrl);
     
     socket.on('newOrder', (data) => {
@@ -178,7 +178,8 @@ export const usePos = (props) => {
   };
 
   const cartTotals = useMemo(() => {
-    const subtotal = activeCart.reduce((acc, item) => {
+    const targetCart = orderToPay ? orderToPay.items : activeCart;
+    const subtotal = targetCart.reduce((acc, item) => {
       const price = item.rawPrice || parseInt(String(item.price).replace(/[^0-9]/g, '') || '0');
       const qtyToCalc = isSplitMode ? (splitSelection[item.id] || 0) : item.qty;
       return acc + (price * qtyToCalc);
@@ -209,7 +210,7 @@ export const usePos = (props) => {
     }
 
     return { subtotal, tax, serviceCharge, discountAmount, memberDiscount, pointsDiscount, total: finalTotal };
-  }, [activeCart, discount, isSplitMode, splitSelection, selectedCustomer, storeSettings, usePoints]);
+  }, [activeCart, orderToPay, discount, isSplitMode, splitSelection, selectedCustomer, storeSettings, usePoints]);
 
   const handleApplyVoucher = () => {
     if (!voucherCode) return;
@@ -219,11 +220,21 @@ export const usePos = (props) => {
       setAppliedVoucher(null);
       return;
     }
-    if (!voucher.isActive) {
+    const isActive = voucher.isActive !== undefined ? voucher.isActive : voucher.is_active;
+    if (isActive === false) {
       toast.error('Voucher ini sudah tidak aktif.');
       return;
     }
-    const currentSubtotal = activeCart.reduce((acc, item) => acc + (parseInt(String(item.price).replace(/\D/g,'')) * item.qty), 0);
+    if (voucher.quota === 0) {
+      toast.error('Kuota voucher sudah habis.');
+      return;
+    }
+    if (voucher.expiryDate && new Date(voucher.expiryDate) < new Date()) {
+      toast.error('Voucher sudah kadaluarsa.');
+      return;
+    }
+    const targetCart = orderToPay ? orderToPay.items : activeCart;
+    const currentSubtotal = targetCart.reduce((acc, item) => acc + (parseInt(String(item.price).replace(/\D/g,'')) * item.qty), 0);
     if (currentSubtotal < voucher.minOrder) {
       toast.warn(`Minimal belanja Rp ${voucher.minOrder.toLocaleString('id-ID')} untuk promo ini.`);
       return;
@@ -236,9 +247,11 @@ export const usePos = (props) => {
 
   const holdCart = () => {
     if (activeCart.length === 0) return;
-    const newHeldCart = { id: Date.now(), items: activeCart, time: new Date() };
+    const newHeldCart = { id: Date.now(), items: activeCart, time: new Date(), table: selectedTable, customer: selectedCustomer };
     setHeldCarts([newHeldCart, ...heldCarts]);
     setActiveCart([]);
+    setSelectedTable(null);
+    setSelectedCustomer(null);
     toast.info(`Transaksi #${newHeldCart.id} ditahan.`);
   };
 
@@ -250,24 +263,26 @@ export const usePos = (props) => {
     const cartToResume = heldCarts.find(c => c.id === cartId);
     if (!cartToResume) { toast.error('Transaksi tidak ditemukan.'); return; }
     setActiveCart(cartToResume.items);
+    setSelectedTable(cartToResume.table || null);
+    setSelectedCustomer(cartToResume.customer || null);
     setHeldCarts(heldCarts.filter(c => c.id !== cartId));
     toast.success(`Transaksi #${cartId} dilanjutkan.`);
   };
 
   const fetchHistoryOrders = async () => {
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/orders`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const allOrders = await res.json();
-        const today = new Date().toISOString().slice(0, 10);
+        const todayStr = new Date().toLocaleDateString('en-CA');
         const filtered = allOrders.filter(o => 
-          o.date.startsWith(today) && 
-          o.items.some(i => i.service === 'Restoran') &&
-          ['Completed', 'Cancelled'].includes(o.status)
+          new Date(o.date).toLocaleDateString('en-CA') === todayStr && 
+          o.items.some(i => i.service === 'Restoran')
+          // ✨ FIX: Filter dihapus agar semua jenis pesanan masuk ke log Riwayat Kasir
         );
         setHistoryOrders(filtered.sort((a, b) => new Date(b.date) - new Date(a.date)));
         setShowHistoryModal(true);
@@ -278,7 +293,7 @@ export const usePos = (props) => {
   const handleVoidOrder = async (orderId) => {
     if (!window.confirm("Yakin ingin membatalkan transaksi ini? Stok akan dikembalikan.")) return;
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
         const res = await fetch(`${backendUrl}/api/orders/${orderId}/status`, {
             method: 'PUT',
@@ -325,7 +340,7 @@ export const usePos = (props) => {
   const handleAddCustomer = async () => {
     if (!newCustomerForm.name || !newCustomerForm.phone) return toast.warn("Isi nama dan no HP.");
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/customers`, {
         method: 'POST',
@@ -372,7 +387,7 @@ export const usePos = (props) => {
 
   const fetchPendingOrders = async () => {
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/orders`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -380,7 +395,7 @@ export const usePos = (props) => {
       if (res.ok) {
         const allOrders = await res.json();
         const activeOrders = allOrders.filter(o =>
-          ['Need_Confirmation', 'Pending', 'Processed'].includes(o.status) &&
+          ['Need_Confirmation', 'Pending', 'Processed', 'Cooking', 'Ready'].includes(o.status) &&
           o.items.some(i => i.service === 'Restoran')
         );
         setPendingOrders(activeOrders);
@@ -397,7 +412,7 @@ export const usePos = (props) => {
     if (activeCart.length === 0) return toast.warn("Keranjang kosong.");
     
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
         const res = await fetch(`${backendUrl}/api/v2/orders`, {
           method: 'POST',
@@ -417,7 +432,8 @@ export const usePos = (props) => {
       });
         const result = await res.json();
 
-      if(res.ok) { 
+      if(res.ok) {
+            toast.success(`Pesanan dikirim ke dapur! Ref: ${result.order?.receiptNumber || result.orderId || '-'}`);
             handlePrintChecker({
                 table: selectedTable ? selectedTable.name : 'Takeaway (Saved)',
                 items: activeCart,
@@ -428,7 +444,7 @@ export const usePos = (props) => {
             setUsePoints(0);
             setDiscount({ type: 'percent', value: 0 });
             setSelectedTable(null);
-            setShowTableModal(true); 
+            setShowTableModal(true);
         } else {
             toast.error(result.error || "Gagal mengirim pesanan");
         }
@@ -437,7 +453,7 @@ export const usePos = (props) => {
 
   const handleConfirmOrder = async (order) => {
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
         const res = await fetch(`${backendUrl}/api/orders/${order.id}/status`, {
             method: 'PUT',
@@ -473,16 +489,37 @@ export const usePos = (props) => {
   const handlePayPendingOrderClick = (order) => {
     setOrderToPay(order); 
     setShowPaymentModal(true); 
+    setShowPendingModal(false); // ✨ FIX: Tutup modal antrean agar tidak bertumpuk dengan form bayar
+    
+    // ✨ FIX: Reset diskon sebelumnya dan coba auto-select customer dari nama pesanan
+    setDiscount({ type: 'percent', value: 0 });
+    setDiscountInput('');
+    setVoucherCode('');
+    setAppliedVoucher(null);
+    setUsePoints(0);
+    
+    if (order.customerName && order.customerName !== 'Takeaway' && customers.length > 0) {
+        const cust = customers.find(c => c.name.toLowerCase() === order.customerName.toLowerCase());
+        setSelectedCustomer(cust || null);
+    } else { setSelectedCustomer(null); }
   };
 
   const confirmPayPendingOrder = async (method) => {
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/orders/${orderToPay.id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ status: 'Completed', processedBy: props.user.id, paymentMethod: method })
+        body: JSON.stringify({ 
+            status: 'Completed', 
+            processedBy: props.user.id, 
+            paymentMethod: method,
+            total: cartTotals.total,
+            voucherCode: appliedVoucher ? appliedVoucher.code : null,
+            memberId: selectedCustomer ? selectedCustomer.id : null,
+            redeemPoints: usePoints
+        })
       });
 
       if (!res.ok) throw new Error("Gagal update status");
@@ -499,25 +536,57 @@ export const usePos = (props) => {
         });
       }
 
-      const subtotal = orderToPay.items.reduce((acc, item) => {
-        const price = parseInt(String(item.price).replace(/[^0-9]/g, '') || '0');
-        return acc + (price * item.qty);
-      }, 0);
-      
-      const serviceCharge = subtotal * (storeSettings.serviceChargePercentage / 100);
-      const tax = (subtotal + serviceCharge) * (storeSettings.taxPercentage / 100);
-      const total = subtotal + serviceCharge + tax;
-
-      const receiptData = { ...orderToPay, subtotal, tax, total, discountAmount: 0, voucherCode: null, paymentMethod: method };
+      const receiptData = { 
+          ...orderToPay, 
+          subtotal: cartTotals.subtotal, 
+          tax: cartTotals.tax, 
+          total: cartTotals.total, 
+          serviceCharge: cartTotals.serviceCharge,
+          discountAmount: cartTotals.discountAmount, 
+          pointsDiscount: cartTotals.pointsDiscount,
+          voucherDiscountAmount: appliedVoucher ? cartTotals.discountAmount : 0,
+          manualDiscountAmount: !appliedVoucher && discount.value > 0 ? cartTotals.discountAmount : 0,
+          manualDiscountType: discount.type,
+          manualDiscountValue: discount.value,
+          voucherCode: appliedVoucher ? appliedVoucher.code : null, 
+          paymentMethod: method,
+          customerName: selectedCustomer ? selectedCustomer.name : orderToPay.customerName
+      };
 
       handlePrintReceipt(receiptData);
       setPendingOrders(pendingOrders.filter(o => o.id !== orderToPay.id)); 
       setOrderToPay(null); 
       setShowPaymentModal(false); 
+      
+      setDiscount({ type: 'percent', value: 0 }); 
+      setDiscountInput('');
+      setVoucherCode('');
+      setAppliedVoucher(null);
+      setUsePoints(0);
+      setSelectedCustomer(null);
     } catch (err) {
       console.error(err);
       toast.error("Gagal memproses pembayaran.");
     }
+  };
+
+  // ✨ FITUR BARU: Menyelesaikan pesanan yang SUDAH LUNAS (Bayar Sekarang) saat Dapur sudah selesai
+  const handleCompleteOrder = async (orderId) => {
+    const token = localStorage.getItem('resto_token');
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    try {
+        const res = await fetch(`${backendUrl}/api/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ status: 'Completed', processedBy: props.user?.id })
+        });
+        if (res.ok) {
+            toast.success('Pesanan LUNAS berhasil diselesaikan!');
+            fetchPendingOrders();
+        } else {
+            toast.error("Gagal menyelesaikan pesanan.");
+        }
+    } catch (err) { toast.error("Koneksi error."); }
   };
 
   const handlePrintReceipt = (data) => {
@@ -622,7 +691,9 @@ export const usePos = (props) => {
          
          <div class="summary-container">
             <div class="summary-row"><span>Subtotal</span><span>${(data.subtotal || 0).toLocaleString('id-ID')}</span></div>
-            ${data.discountAmount > 0 ? `<div class="summary-row"><span>Diskon ${data.voucherCode ? '('+data.voucherCode+')' : ''}</span><span>-${data.discountAmount.toLocaleString('id-ID')}</span></div>` : ''}
+            ${(data.voucherDiscountAmount > 0) ? `<div class="summary-row"><span>Diskon ${data.voucherName ? data.voucherName + ' ' : ''}${data.voucherCode ? '('+data.voucherCode+')' : ''}</span><span>-Rp ${data.voucherDiscountAmount.toLocaleString('id-ID')}</span></div>` : ''}
+            ${(data.manualDiscountAmount > 0) ? `<div class="summary-row"><span>Diskon Manual (${data.manualDiscountType === 'percent' ? data.manualDiscountValue + '%' : 'Rp ' + (data.manualDiscountValue || 0).toLocaleString('id-ID')})</span><span>-Rp ${data.manualDiscountAmount.toLocaleString('id-ID')}</span></div>` : ''}
+            ${(!data.voucherDiscountAmount && !data.manualDiscountAmount && (data.discountAmount || 0) > 0) ? `<div class="summary-row"><span>Diskon ${data.voucherCode ? '('+data.voucherCode+')' : ''}</span><span>-Rp ${data.discountAmount.toLocaleString('id-ID')}</span></div>` : ''}
             ${(data.serviceCharge || 0) > 0 ? `<div class="summary-row"><span>Service (${storeSettings.serviceChargePercentage}%)</span><span>${Math.round(data.serviceCharge).toLocaleString('id-ID')}</span></div>` : ''}
             <div class="summary-row"><span>PPN (${storeSettings.taxPercentage}%)</span><span>${Math.round(data.tax || 0).toLocaleString('id-ID')}</span></div>
             ${data.pointsDiscount > 0 ? `<div class="summary-row"><span>Tukar Poin</span><span>-${data.pointsDiscount.toLocaleString('id-ID')}</span></div>` : ''}
@@ -636,7 +707,7 @@ export const usePos = (props) => {
          <div class="footer">
             <div class="footer-thanks">TERIMA KASIH</div>
             <div>${storeSettings.receiptFooter || 'Silakan datang kembali!'}</div>
-            <div class="watermark">Powered by Superapp POS</div>
+            <div class="watermark">Powered by Resto-app POS</div>
          </div>
       </body>
       </html>
@@ -752,7 +823,7 @@ export const usePos = (props) => {
     }
 
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/orders/merge`, {
         method: 'POST',
@@ -809,7 +880,7 @@ export const usePos = (props) => {
       return;
     }
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/shifts/start`, {
         method: 'POST',
@@ -843,7 +914,7 @@ export const usePos = (props) => {
         return;
     }
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
         const res = await fetch(`${backendUrl}/api/shifts/movement`, {
             method: 'POST',
@@ -873,7 +944,7 @@ export const usePos = (props) => {
       return;
     }
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       const res = await fetch(`${backendUrl}/api/shifts/end`, {
         method: 'POST',
@@ -916,7 +987,7 @@ export const usePos = (props) => {
 
   const finalizeOrder = async (paymentMethod) => {
     const token = localStorage.getItem('resto_token');
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     try {
       let itemsToPay = activeCart;
       if (isSplitMode) {
@@ -969,22 +1040,39 @@ export const usePos = (props) => {
           subtotal: cartTotals.subtotal,
           tax: cartTotals.tax,
           discountAmount: cartTotals.discountAmount,
+          voucherDiscountAmount: appliedVoucher ? cartTotals.discountAmount : 0,
+          voucherName: appliedVoucher ? appliedVoucher.name : null,
+          voucherCode: appliedVoucher ? appliedVoucher.code : null,
+          manualDiscountAmount: !appliedVoucher && discount.value > 0 ? cartTotals.discountAmount : 0,
+          manualDiscountType: discount.type,
+          manualDiscountValue: discount.value,
           total: cartTotals.total,
           paymentMethod: paymentMethod,
-          voucherCode: appliedVoucher ? appliedVoucher.code : null,
-          customerName: selectedCustomer ? selectedCustomer.name : null, 
+          customerName: selectedCustomer ? selectedCustomer.name : null,
           pointsDiscount: cartTotals.pointsDiscount
         };
         handlePrintReceipt(receiptData);
 
         if (isSplitMode) {
+            // Hitung sisa pesanan yang belum dibayar
             const newCart = activeCart.map(item => {
                 const paidQty = splitSelection[item.id] || 0;
                 return { ...item, qty: item.qty - paidQty };
             }).filter(item => item.qty > 0);
-            setActiveCart(newCart);
+            
             setSplitSelection({});
-            if (newCart.length === 0) setIsSplitMode(false); 
+            setIsSplitMode(false);
+            
+            if (newCart.length > 0) {
+                // ✨ FIX: Otomatis pindahkan sisa pesanan ke menu "✋ Tahan"
+                const newHeldCart = { id: Date.now(), items: newCart, time: new Date(), table: selectedTable, customer: selectedCustomer };
+                setHeldCarts(prev => [newHeldCart, ...prev]);
+                setActiveCart([]);
+                // Beri jeda sedikit agar toast sukses bayar muncul duluan
+                setTimeout(() => toast.info(`Sisa pesanan otomatis disimpan di "Tahan" ✋`), 600);
+            } else {
+                setActiveCart([]);
+            }
         } else {
             setActiveCart([]);
         }
@@ -1011,6 +1099,6 @@ export const usePos = (props) => {
   };
 
   return {
-    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, showNoteModal, setShowNoteModal, noteItem, setNoteItem, noteInput, setNoteInput, saveNote, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
+    menuItems, setMenuItems, chefs, setChefs, selectedChef, setSelectedChef, activeCart, setActiveCart, heldCarts, setHeldCarts, searchTerm, setSearchTerm, activeCategory, setActiveCategory, showPaymentModal, setShowPaymentModal, showHeldCarts, setShowHeldCarts, showTableModal, setShowTableModal, selectedTable, setSelectedTable, showPendingModal, setShowPendingModal, pendingOrders, setPendingOrders, orderToPay, setOrderToPay, selectedOrders, setSelectedOrders, discount, setDiscount, vouchers, setVouchers, voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, discountInput, setDiscountInput, usePoints, setUsePoints, activeShift, setActiveShift, shiftLoading, setShiftLoading, startCashInput, setStartCashInput, endCashInput, setEndCashInput, showShiftEndModal, setShowShiftEndModal, showCashModal, setShowCashModal, cashType, setCashType, cashAmount, setCashAmount, cashNote, setCashNote, showHistoryModal, setShowHistoryModal, historyOrders, setHistoryOrders, showCustomModal, setShowCustomModal, customForm, setCustomForm, isSplitMode, setIsSplitMode, splitSelection, setSplitSelection, tables, setTables, tableViewMode, setTableViewMode, customers, setCustomers, showCustomerModal, setShowCustomerModal, selectedCustomer, setSelectedCustomer, newCustomerForm, setNewCustomerForm, storeSettings, setStoreSettings, showQrisModal, setShowQrisModal, qrisStatus, setQrisStatus, showNoteModal, setShowNoteModal, noteItem, setNoteItem, noteInput, setNoteInput, saveNote, categories, filteredMenu, addToCart, updateQuantity, removeFromCart, cartTotals, handleApplyVoucher, holdCart, resumeCart, fetchHistoryOrders, handleVoidOrder, handleSendWA, handleAddCustomer, handleAddCustomItem, handleSelectTable, fetchPendingOrders, handleSendToKitchen, handleConfirmOrder, handlePayPendingOrderClick, confirmPayPendingOrder, handleCompleteOrder, handlePrintReceipt, handlePrintChecker, handleSelectOrder, handleMergeOrMove, handleEditNote, applyDiscount, handleStartShift, handleSaveCashMovement, handleEndShift, handleQrisPayment, handleSimulatePaymentSuccess, finalizeOrder
   };
 };

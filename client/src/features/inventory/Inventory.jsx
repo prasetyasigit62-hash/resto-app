@@ -12,7 +12,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
     const [showWasteModal, setShowWasteModal] = useState(false); // ✨ State Modal Waste
     const [wasteForm, setWasteForm] = useState({ ingredientId: '', qty: '', reason: 'Busuk/Kadaluarsa' });
     const [showRestockModal, setShowRestockModal] = useState(false); // ✨ State Modal Restock
-    const [restockForm, setRestockForm] = useState({ ingredientId: '', qty: '', cost: '', supplier: '' });
+    const [restockForm, setRestockForm] = useState({ ingredientId: '', qty: '', cost: '', supplierId: '' });
     const [formData, setFormData] = useState({ name: '', stock: '', unit: '', min_stock: '', cost: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all'); // 'all', 'low'
@@ -32,10 +32,21 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
         const token = localStorage.getItem('resto_token');
         const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
         try {
-            const res = await fetch(`${backendUrl}/api/ingredients`, { // Endpoint generic
+            const res = await fetch(`${backendUrl}/api/ingredients`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (res.ok) setItems(await res.json());
+            if (res.ok) {
+                const rawData = await res.json();
+                // Normalize Prisma camelCase fields to what the UI expects
+                setItems(rawData.map(item => ({
+                    ...item,
+                    cost: item.lastPrice ?? item.cost ?? 0,
+                    min_stock: item.minStock ?? item.min_stock ?? 0,
+                    stock: item.stocks && item.stocks.length > 0
+                        ? item.stocks.reduce((sum, s) => sum + (s.qty || 0), 0)
+                        : (item.stock ?? 0),
+                })));
+            }
         } catch (err) { toast.error("Gagal memuat inventori."); }
         finally { setLoading(false); }
     };
@@ -139,22 +150,26 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
     // ✨ Handle Submit Waste
     const handleSubmitWaste = async () => {
         if (!wasteForm.ingredientId || !wasteForm.qty) return toast.warn("Pilih bahan dan masukkan jumlah.");
-        
+
         const token = localStorage.getItem('resto_token');
         const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
         try {
             const res = await fetch(`${backendUrl}/api/inventory/waste`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(wasteForm)
+                body: JSON.stringify({
+                    materialId: wasteForm.ingredientId,
+                    wasteQty: Number(wasteForm.qty),
+                    note: wasteForm.reason,
+                })
             });
-            
+
             const data = await res.json();
             if (res.ok) {
-                toast.success(`Waste tercatat! Kerugian: Stok berkurang.`);
+                toast.success(`Waste tercatat! Stok berkurang ${wasteForm.qty} unit.`);
                 setShowWasteModal(false);
                 setWasteForm({ ingredientId: '', qty: '', reason: 'Busuk/Kadaluarsa' });
-                fetchItems(); // Refresh stok
+                fetchItems();
             } else {
                 toast.error(data.error || "Gagal mencatat waste.");
             }
@@ -164,26 +179,29 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
     // ✨ Handle Submit Restock
     const handleSubmitRestock = async () => {
         if (!restockForm.ingredientId || !restockForm.qty) return toast.warn("Pilih bahan dan masukkan jumlah.");
-        
+
         const token = localStorage.getItem('resto_token');
         const backendUrl = import.meta.env.VITE_API_BASE_URL?.split('/api')[0] || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
         try {
             const payload = {
-                ...restockForm,
-                cost: restockForm.cost ? Number(String(restockForm.cost).replace(/\./g, '')) : ''
+                materialId: restockForm.ingredientId,
+                qty: Number(restockForm.qty),
+                cost: restockForm.cost ? Number(String(restockForm.cost).replace(/\./g, '')) : null,
+                supplierId: restockForm.supplierId || null,
+                note: 'Quick Restock Manual',
             };
             const res = await fetch(`${backendUrl}/api/inventory/restock`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(payload)
             });
-            
+
             const data = await res.json();
             if (res.ok) {
-                toast.success(`Restock berhasil! Stok bertambah.`);
+                toast.success(`Restock berhasil! Stok bertambah ${restockForm.qty} unit.`);
                 setShowRestockModal(false);
-                setRestockForm({ ingredientId: '', qty: '', cost: '', supplier: '' });
-                fetchItems(); // Refresh stok
+                setRestockForm({ ingredientId: '', qty: '', cost: '', supplierId: '' });
+                fetchItems();
             } else {
                 toast.error(data.error || "Gagal mencatat restock.");
             }
@@ -213,7 +231,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
 
         // 1. Header Metadata Laporan
         let csvContent = `LAPORAN STOK OPNAME\n`;
-        csvContent += `Restoran:,Superapp Resto\n`;
+        csvContent += `Restoran:,Resto-app\n`;
         csvContent += `Tanggal Cetak:,${escapeCsv(currentDate)}\n`;
         csvContent += `Total Item:,${dataToExport.length}\n`;
         csvContent += `\n`; // Baris kosong pemisah
@@ -277,7 +295,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
         
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text("Superapp Resto & Inventory System", 105, 28, null, "center");
+        doc.text("Resto-app Inventory System", 105, 28, null, "center");
         doc.text(`Per Tanggal: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 105, 35, null, "center");
 
         // 2. Ringkasan Aset
@@ -356,7 +374,7 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
             textContent += `${idx + 1}. ${item.name}\n   Sisa: ${item.stock} ${item.unit}\n   Saran Beli: ${buyQty} ${item.unit}\n   Est. Biaya: Rp ${estCost.toLocaleString('id-ID')}\n\n`;
         });
         
-        textContent += `---------------------------\nTotal Estimasi Anggaran: Rp ${totalEstCost.toLocaleString('id-ID')}\n\nGenerated by Superapp POS`;
+        textContent += `---------------------------\nTotal Estimasi Anggaran: Rp ${totalEstCost.toLocaleString('id-ID')}\n\nGenerated by Resto-app POS`;
 
         const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -640,15 +658,15 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
                         </div>
                         
                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color:'#475569' }}>Pilih Bahan</label>
-                        <select 
-                            className="profile-input" 
-                            value={restockForm.ingredientId} 
+                        <select
+                            className="profile-input"
+                            value={restockForm.ingredientId}
                             onChange={e => {
-                                const item = items.find(i => i.id == e.target.value);
+                                const item = items.find(i => String(i.id) === String(e.target.value));
                                 setRestockForm({
-                                    ...restockForm, 
+                                    ...restockForm,
                                     ingredientId: e.target.value,
-                                    cost: item ? formatRupiah(item.cost) : '' // Auto-fill harga lama
+                                    cost: item ? formatRupiah(item.cost) : '',
                                 });
                             }}
                         >
@@ -671,10 +689,10 @@ const Inventory = ({ setConfirmModal, onDataUpdated, onEdit }) => {
 
                         <div style={{marginTop:'15px'}}>
                             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color:'#475569' }}>Pilih Supplier</label>
-                            <select className="profile-input" value={restockForm.supplier} onChange={e => setRestockForm({...restockForm, supplier: e.target.value})}>
+                            <select className="profile-input" value={restockForm.supplierId} onChange={e => setRestockForm({...restockForm, supplierId: e.target.value})}>
                                 <option value="">-- Umum / Tanpa Supplier --</option>
                                 {suppliers.map(s => (
-                                    <option key={s.id} value={s.name}>{s.name} ({s.contactPerson})</option>
+                                    <option key={s.id} value={s.id}>{s.name} ({s.contactPerson})</option>
                                 ))}
                             </select>
                         </div>
